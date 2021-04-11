@@ -17,7 +17,6 @@ void ptd_create(void *arg) {
 	if(ret < 0) {
 		
 	}
-
 	
 }
 
