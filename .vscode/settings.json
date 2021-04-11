@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "udp_speed_test_recv.C": "cpp",
+        "tcp_speed_test_recv.C": "cpp",
+        "tcp_speed_test_send.C": "cpp",
+        "tcp_send.C": "cpp"
+    }
+}

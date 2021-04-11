@@ -1,0 +1,24 @@
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+void ptd_create(void *arg) {
+	int ret;
+
+	pthread_t ptd;
+	pthread_attr_t attr;
+
+	ret = pthread_attr_init(&attr);//初始化线程属性变量,成功返回0,失败-1
+	if(ret < 0) {
+		perror("Init attr fail");
+		exit(1);
+	}
+	ret = pthread_attr_setscope(&attr, PTHREAD_SCOPE_PROCESS);//PTHREAD_SCOPE_SYSTEM绑定;PTHREAD_SCOPE_PROCESS非绑定
+
+
+	
+}
+
+int main() {
+	return 0;
+}
