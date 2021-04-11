@@ -14,7 +14,9 @@ void ptd_create(void *arg) {
 		exit(1);
 	}
 	ret = pthread_attr_setscope(&attr, PTHREAD_SCOPE_PROCESS);//PTHREAD_SCOPE_SYSTEM绑定;PTHREAD_SCOPE_PROCESS非绑定
-
+	if(ret < 0) {
+		
+	}
 
 	
 }
