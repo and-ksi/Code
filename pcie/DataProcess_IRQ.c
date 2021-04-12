@@ -1,3 +1,4 @@
+#include <sys/mman.h>
 #include <assert.h>
 #include <time.h>
 #include <fcntl.h>
@@ -19,7 +20,6 @@
 #include <pthread.h>
 #include <sched.h>
 #include <semaphore.h>
-#include <sys/mman.h>
 #include <errno.h>
 #include <pthread.h>
 
