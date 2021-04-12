@@ -39,7 +39,6 @@ void ptd_create(void *arg, void *functionbody) {
 	pthread_create(&ptd, &attr, (void *(*)(void *))functionbody, (void *)arg);
 	
 	pthread_attr_destroy(&attr);//消除线程属性
-
 }
 
 int main() {

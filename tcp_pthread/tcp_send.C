@@ -80,14 +80,39 @@ void *msgsend(void *arg) {
 	return NULL;
 }
 
-void ptd_create(void *arg) {
-	MSG *parg = (MSG *)arg;
-	int id = parg->id;
-	parg->id = -1;
+void ptd_create(void *arg, void *functionbody) {
+	int ret;
+
+	cpu_set_t cpusetinfo;
+	CPU_ZERO(&cpusetinfo);
+	CPU_SET(1, &cpusetinfo);//将core1加入到cpu集中,同理可以将其他的cpu加入
+
+
+	pthread_t ptd;
 	pthread_attr_t attr;
-	pthread_attr_init(&attr);
 
-
-
-	pthread_create(&parg->ptd[id], &attr, msgsend, (void *)arg);
+	ret = pthread_attr_init(&attr);//初始化线程属性变量,成功返回0,失败-1
+	if(ret < 0) {
+		perror("Init attr fail");
+		exit(1);
+	}
+	/* ret = pthread_attr_setscope(&attr, PTHREAD_SCOPE_PROCESS);//PTHREAD_SCOPE_SYSTEM绑定;PTHREAD_SCOPE_PROCESS非绑定
+	if(ret < 0) {
+		perror("Setscope fail");
+		exit(1);
+	} */
+	ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);//线程分离属性:PTHREAD_CREATE_JOINABLE（非分离）
+	if(ret < 0) {
+		perror("Detached fail");
+		exit(1);
+	}
+	ret = pthread_attr_setaffinity_np(&attr, sizeof(cpusetinfo), &cpusetinfo);
+	if(ret < 0) {
+		perror("Core set fail");
+		exit(1);
+	}
+	
+	pthread_create(&ptd, &attr, (void *(*)(void *))functionbody, (void *)arg);
+	
+	pthread_attr_destroy(&attr);//消除线程属性
 }

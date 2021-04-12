@@ -32,7 +32,7 @@
 
 int pcie_fd;
 void * pcie_addr;
-int pData[1024*1];
+int pData[1024*8];
 
 int main(int argc, char *argv[])
 {
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
     else
         printf("PCIe device open successful!\n"); 
 
-    pcie_addr   = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, pcie_fd, 0);
+    pcie_addr = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, pcie_fd, 0);
    
     printf("Memory map successful!\n");
 

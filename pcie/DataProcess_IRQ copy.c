@@ -44,6 +44,13 @@ int interrupt_fd;
 
 int pData[8*1024];
 
+int cnt;
+
+pthread_t speed_thread;
+int speed1, speed2;
+long int starttime, time1, time2;
+struct timeval time;
+
 
 /*开中断*/
 int open_event(char *devicename)
@@ -116,9 +123,28 @@ void *event_process()
         read_event(interrupt_fd);  //获取用户中断
         read(c2h_fd, pData, 8*1024);
         write_control(control_base,0x0000,0xFFFFFFFF);
+        cnt = cnt +1;
+        printf("cnt = %d\n",cnt);
         printf("Stop read!\n"); 
     }
     pthread_exit(0);  
+}
+
+void *speed_test() {
+    gettimeofday(&time, 0);
+    starttime = time1 = time2 = time.tv_sec;
+    while(1) {
+        gettimeofday(&time, 0);
+        time1 = time.tv_sec;
+        if(time1 - time2 >= 1) {
+            speed1 = 4*cnt/1024;
+            speed2 = 4*cnt/1024/(time1 - starttime);
+            printf("%ld s, speed in one sec:%d MB/s, speed average:%d MB/s",
+             time1, speed1, speed2);
+            time2 = time1;
+        }
+    }
+
 }
 
 int main(int argc, char *argv[])
@@ -157,6 +183,7 @@ int main(int argc, char *argv[])
     work = 1;
     
     pthread_create(&event_thread, NULL, event_process, NULL);
+    pthread_create(&speed_thread, NULL, speed_test, NULL);
     
     while(inp!='o')
     {
@@ -175,7 +202,7 @@ int main(int argc, char *argv[])
         break;
             
         case'e':
-    	    write_control(control_base,0x0000,0xFFFFFFFF);
+    	    cnt = 0;
         break;
         
         case'r':
