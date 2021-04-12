@@ -50,11 +50,11 @@ int main(int argc, char *argv[])
     printf("Memory map successful!\n");
 
     lseek(pcie_fd, IMG_RAM_POS, SEEK_SET);
-    read(pcie_fd, pData, 1024);
+    read(pcie_fd, pData, 8*1024);
 
     printf("Read data successful!\n");
 
-    for(int i=0;i<1024;i++)
+    for(int i=0;i<8*1024;i++)
     {
         printf("The data of address %d is %d \n", i,pData[i]);
     }
