@@ -61,7 +61,7 @@ int main(int argc, char const *argv[]) {
 	for(int i = 0; i < CPU_CORE; i++) {
 		printf("等待连接中......");
 		msg.acfd = accept(fd, (struct sockaddr *)&clientaddr, &len);
-		ptd_create((void *)msg);
+		ptd_create((void *)&msg);
 		while(1) {
 			if(msg.id < 0) {
 				break;

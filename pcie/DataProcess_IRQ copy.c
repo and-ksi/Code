@@ -1,3 +1,4 @@
+#include <sys/mman.h>
 #include <assert.h>
 #include <time.h>
 #include <fcntl.h>
@@ -19,7 +20,6 @@
 #include <pthread.h>
 #include <sched.h>
 #include <semaphore.h>
-#include <sys/mman.h>
 #include <errno.h>
 #include <pthread.h>
 
@@ -182,8 +182,8 @@ int main(int argc, char *argv[])
     
     work = 1;
     
-    pthread_create(&event_thread, NULL, event_process, NULL);
-    pthread_create(&speed_thread, NULL, speed_test, NULL);
+    pthread_create(&event_thread, NULL, (void *(*)(void *))event_process, NULL);
+    pthread_create(&speed_thread, NULL, (void *(*)(void *))speed_test, NULL);
     
     while(inp!='o')
     {
