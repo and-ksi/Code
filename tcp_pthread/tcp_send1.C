@@ -25,33 +25,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-typedef struct board_head{
-    char board_type[8];
-    char board_addr[8];
-    char Ftype[2];
-    char Error[14];
-}BOARD_HEAD;
-
-typedef struct frame_head{
-    char channle_id[8];
-    char error[6];
-    char Ftype[2];
-    char length[16];
-    char timestamp_H[32];
-    char timestamp_L[32];
-}FRAME_HEAD;
-
-typedef struct adc_data{
-    FRAME_HEAD adc_head;
-    char adc_data1[16];
-    char adc_data2[16];
-}ADC_DATA;
-
-typedef struct tdc_data{
-    FRAME_HEAD tdc_head;
-    char tdc_data[32];
-}TDC_DATA;
-
 #define DEVICE_NAME_H2C "/dev/xdma0_h2c_0"
 #define DEVICE_NAME_C2H "/dev/xdma0_c2h_0"
 #define DEVICE_NAME_REG "/dev/xdma0_bypass"
@@ -66,20 +39,19 @@ int h2c_fd ;
 int control_fd;
 void *control_base;
 int interrupt_fd;
+pthread_t event_thread;
 
-int pData[MAP_SIZE];
+char pData[MAP_SIZE];
 int work;
 
 int port = 10000;
 int acfd[10];
 int client_num;
-int ptd_alarm;
+int ptd_alarm, part_alarm;
+int count = 0;
 
 struct sockaddr_in clientaddr[10] = {0};
 pthread_t ptd[10];
-BOARD_HEAD board_head;
-ADC_DATA adc_data;
-TDC_DATA tdc_data;//在main中将这几个结构体初始化为'\0'
 
 /*开中断*/
 int open_event(char *devicename)
@@ -148,6 +120,8 @@ void *event_process()
     {
         read_event(interrupt_fd);  //获取用户中断
         read(c2h_fd, pData, sizeof(pData));
+        count++;
+        part_alarm = 1;
         write_control(control_base,0x0000,0xFFFFFFFF);
     }
     pthread_exit(0);
@@ -155,8 +129,6 @@ void *event_process()
 
 //打开设备并进行读取
 void read_device(){
-    pthread_t event_thread;
-
     control_fd = open_control("/dev/xdma0_bypass");    //打开bypass字符设备
     control_base = mmap_control(control_fd, BYPASS_MAP_SIZE); //获取bypass映射的内存地址
 
@@ -284,8 +256,18 @@ void socket_ptd_create(){
 
 //数据分发
 void *data_part(){
+    char channle_id[8] = {'\0'};
 
-
+    while(count == 0){}
+    while(1){
+        while(part_alarm == -1){}
+        
+        if(count > 1){
+            for()
+        }else {
+            memcpy(channle_id, pData + 32)
+        }
+    }
 
 
 

@@ -48,3 +48,37 @@ int main() {
 void *functionbody(void *arg) {
 	return NULL;
 }
+
+typedef struct board_head
+{
+	char board_type[8];
+	char board_addr[8];
+	char Ftype[2];
+	char Error[14];
+} BOARD_HEAD;
+
+typedef struct frame_head
+{
+	char channle_id[8];
+	char error[6];
+	char Ftype[2];
+	char length[16];
+	char timestamp_H[32];
+	char timestamp_L[32];
+} FRAME_HEAD;
+
+typedef struct adc_data
+{
+	FRAME_HEAD adc_head;
+	char adc_data1[16];
+	char adc_data2[16];
+} ADC_DATA;
+
+typedef struct tdc_data
+{
+	FRAME_HEAD tdc_head;
+	char tdc_data[32];
+} TDC_DATA;
+BOARD_HEAD board_head;
+ADC_DATA adc_data;
+TDC_DATA tdc_data;
