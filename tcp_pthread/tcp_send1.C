@@ -152,6 +152,7 @@ void ptd_create(int *arg, void *functionbody) {
 	}
 	
 	pthread_create(&ptd[*arg], &attr, (void *(*)(void *))functionbody, NULL);
+    printf("Id为%d的线程已创建完毕。", *arg);
 	
 	pthread_attr_destroy(&attr);//销除线程属性
 
@@ -187,17 +188,16 @@ void socket_ptd_create(){
 	}
 
     for(int i = 0; i < CPU_CORE - 1; i++) {
-		printf("等待连接中......");
-		acfd = accept(socket_fd, (struct sockaddr *)&clientaddr, &len);
+		printf("创建第%d个线程...", i);
 		id = i;
         ptd_create(&id, NULL);//这里根据需要更改
-        printf("接到地址%s 的连接")
 		while(1) {
 			if(id < 0) {
 				break;
 			}
 		}	
 	}
+    acfd = accept(socket_fd, (struct sockaddr *)&clientaddr, &len);
 }
 
 int main() {
