@@ -25,6 +25,33 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+typedef struct board_head{
+    char board_type[8];
+    char board_addr[8];
+    char Ftype[2];
+    char Error[14];
+}BOARD_HEAD;
+
+typedef struct frame_head{
+    char channle_id[8];
+    char error[6];
+    char Ftype[2];
+    char length[16];
+    char timestamp_H[32];
+    char timestamp_L[32];
+}FRAME_HEAD;
+
+typedef struct adc_data{
+    FRAME_HEAD adc_head;
+    char adc_data1[16];
+    char adc_data2[16];
+}ADC_DATA;
+
+typedef struct tdc_data{
+    FRAME_HEAD tdc_head;
+    char tdc_data[32];
+}TDC_DATA;
+
 #define DEVICE_NAME_H2C "/dev/xdma0_h2c_0"
 #define DEVICE_NAME_C2H "/dev/xdma0_c2h_0"
 #define DEVICE_NAME_REG "/dev/xdma0_bypass"
@@ -48,6 +75,9 @@ int client_num;
 
 struct sockaddr_in clientaddr[10] = {0};
 pthread_t ptd[10];
+BOARD_HEAD board_head;
+ADC_DATA adc_data;
+TDC_DATA tdc_data;//在main中将这几个结构体初始化为'\0'
 
 /*开中断*/
 int open_event(char *devicename)
@@ -115,7 +145,7 @@ void *event_process()
     while(work==1)
     {
         read_event(interrupt_fd);  //获取用户中断
-        read(c2h_fd, pData, 8*1024);
+        read(c2h_fd, pData, sizeof(pData));
         write_control(control_base,0x0000,0xFFFFFFFF);
     }
     pthread_exit(0);
@@ -196,7 +226,7 @@ void socket_ptd_create(){
 			if(id < 0) {
 				break;
 			}
-		}	
+		}
 	}
 
     printf("请输入客户端数量:\n");
@@ -214,6 +244,17 @@ void socket_ptd_create(){
 
 //数据分发
 void *data_part(){
+
+
+
+
+
+
+    return NULL;
+}
+
+//数据发送
+void *send_data(){
     return NULL;
 }
 
