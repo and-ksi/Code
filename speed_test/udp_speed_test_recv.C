@@ -58,12 +58,12 @@ int main(int argc, char const *argv[]) {
 		gettimeofday(&time, 0);
 		time1 = time.tv_sec;
 		if(time1 - time2 >= 1) {
-			speed1 = 8*(msg.t - t1)/1024/(time1 - time2);
-			speed2 = 8*msg.t/1024/(time1 - starttime);
+			speed1 = (msg.t - t1)/1024/(time1 - time2);
+			speed2 = msg.t/1024/(time1 - starttime);
 			printf("%lds 	已接收%dMB, 	当前传输速度%dMB/s, 	总传输速度%dMB/s.\n", 
-				time1 - starttime, 8*msg.t/1024, speed1, speed2);
+				time1 - starttime, msg.t/1024, speed1, speed2);
 			sprintf(buf, "%ld s 	%d MB 	%d MB/s		%d MB/s 	\n",
-			 time1 - starttime, 8*msg.t/1024, speed1, speed2);
+			 time1 - starttime, msg.t/1024, speed1, speed2);
 			fputs(buf, fp);
 			time2 = time1;
 			t1 = msg.t;
@@ -90,7 +90,7 @@ void *msgrecv(void *arg) {
 			break;
 		}
 		parg->t++;
-		memset(&message, '\0', sizeof(message));
+		memset(&message, 0, sizeof(message));
 	}
 	return NULL;
 }

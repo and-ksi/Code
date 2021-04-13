@@ -46,6 +46,7 @@ int main(int argc, char const *argv[]) {
 
 	pthread_t ptd;
 	pthread_create(&ptd, 0, msgsend, (void *)&msg);
+	gettimeofday(&time, 0);
 	starttime = time1 = time2 = time.tv_sec;
 	while(time1 - starttime < 600) {
 		gettimeofday(&time, 0);
