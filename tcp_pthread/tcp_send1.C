@@ -56,7 +56,8 @@ typedef struct tdc_data{
 #define DEVICE_NAME_C2H "/dev/xdma0_c2h_0"
 #define DEVICE_NAME_REG "/dev/xdma0_bypass"
 
-#define MAP_SIZE        (8*1024)//8bit
+#define MAP_SIZE        (32*1024)//8bit
+#define BYPASS_MAP_SIZE (4*1024)
 #define IMG_RAM_POS     (0*1024*1024)
 #define CPU_CORE        (4)//CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
 
@@ -66,12 +67,13 @@ int control_fd;
 void *control_base;
 int interrupt_fd;
 
-int pData[8*1024];
+int pData[MAP_SIZE];
 int work;
 
 int port = 10000;
 int acfd[10];
 int client_num;
+int ptd_alarm;
 
 struct sockaddr_in clientaddr[10] = {0};
 pthread_t ptd[10];
@@ -151,8 +153,46 @@ void *event_process()
     pthread_exit(0);
 }
 
+//打开设备并进行读取
+void read_device(){
+    pthread_t event_thread;
+
+    control_fd = open_control("/dev/xdma0_bypass");    //打开bypass字符设备
+    control_base = mmap_control(control_fd, BYPASS_MAP_SIZE); //获取bypass映射的内存地址
+
+    c2h_fd = open(DEVICE_NAME_C2H, O_RDONLY | O_NONBLOCK); //打开pcie c2h设备
+    if (c2h_fd == -1)
+    {
+        printf("PCIe c2h device open failed!\n");
+        exit(1);
+    }
+    else
+        printf("PCIe c2h device open successful!\n");
+
+    mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, c2h_fd, 0);
+
+    printf("c2h device Memory map successful!\n");
+
+    h2c_fd = open(DEVICE_NAME_H2C, O_WRONLY | O_NONBLOCK); //打开pcie  h2c设备
+    if (h2c_fd == -1)
+    {
+        printf("PCIe h2c device open failed!\n");
+        exit(1);
+    }
+    else
+        printf("PCIe h2c device open successful!\n");
+
+    mmap(0, MAP_SIZE, PROT_WRITE, MAP_SHARED, h2c_fd, 0);
+
+    printf("h2c device Memory map successful!\n");
+
+    work = 1;
+
+    pthread_create(&event_thread, NULL, (void *(*)(void *))event_process, NULL);
+}
+
 //根据CPU创建和分配线程
-void ptd_create(int *arg, void *functionbody) {
+void ptd_create(pthread_t *arg, void *functionbody) {
 	int ret;
 
 	cpu_set_t cpusetinfo;
@@ -182,12 +222,12 @@ void ptd_create(int *arg, void *functionbody) {
 		exit(1);
 	}
 	
-	pthread_create(&ptd[*arg], &attr, (void *(*)(void *))functionbody, NULL);
-    printf("Id为%d的线程已创建完毕。", *arg);
+	pthread_create(arg, &attr, (void *(*)(void *))functionbody, NULL);
+    //printf("Id为%d的线程已创建完毕。", *arg);
 	
 	pthread_attr_destroy(&attr);//销除线程属性
 
-    *arg = -1;
+    ptd_alarm = -1;
 }
 
 //socket和线程创建函数
@@ -220,10 +260,10 @@ void socket_ptd_create(){
 
     for(int i = 0; i < CPU_CORE - 1; i++) {
 		printf("创建第%d个线程...", i);
-		id = i;
-        ptd_create(&id, NULL);//这里根据需要更改
+        ptd_alarm = 1;
+        ptd_create(&ptd[i], (void *)data_send);//这里根据需要更改
 		while(1) {
-			if(id < 0) {
+			if(ptd_alarm < 0) {
 				break;
 			}
 		}
@@ -254,7 +294,7 @@ void *data_part(){
 }
 
 //数据发送
-void *send_data(){
+void *data_send(){
     return NULL;
 }
 
