@@ -43,9 +43,10 @@ int pData[8*1024];
 int work;
 
 int port = 10000;
-int acfd;
+int acfd[10];
+int client_num;
 
-struct sockaddr_in clientaddr = {0};
+struct sockaddr_in clientaddr[10] = {0};
 pthread_t ptd[10];
 
 /*开中断*/
@@ -197,7 +198,23 @@ void socket_ptd_create(){
 			}
 		}	
 	}
-    acfd = accept(socket_fd, (struct sockaddr *)&clientaddr, &len);
+
+    printf("请输入客户端数量:\n");
+    scanf("%d", &client_num);
+    for(int i = 0; i < client_num; i++){
+        printf("等待客户端连接...");
+        acfd[i] = accept(socket_fd, (struct sockaddr *)&clientaddr[i], &len);
+        if(acfd[i] < 0){
+            perror("Accept fail");
+            exit(1);
+        }
+        printf("第%d个客户端已连接!", i);//希望能够显示连接的客户端地址
+    }
+}
+
+//数据分发
+void *data_part(){
+    return NULL;
 }
 
 int main() {
