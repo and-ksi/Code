@@ -33,6 +33,8 @@
 #define BYPASS_MAP_SIZE (4*1024)
 #define IMG_RAM_POS     (0*1024*1024)
 #define CPU_CORE        (4)//CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
+#define PACK_SIZE       (8*1024)
+#define CLIENT_NUM      (7)
 
 int c2h_fd ;
 int h2c_fd ;
@@ -46,7 +48,6 @@ int work;
 
 int port = 10000;
 int acfd[10];
-int client_num;
 int ptd_alarm, part_alarm;
 int count = 0;
 
@@ -119,6 +120,7 @@ void *event_process()
     while(work==1)
     {
         read_event(interrupt_fd);  //获取用户中断
+        while(part_alarm == 1){}
         read(c2h_fd, pData, sizeof(pData));
         count++;
         part_alarm = 1;
@@ -129,6 +131,7 @@ void *event_process()
 
 //打开设备并进行读取
 void read_device(){
+    char inp;
     control_fd = open_control("/dev/xdma0_bypass");    //打开bypass字符设备
     control_base = mmap_control(control_fd, BYPASS_MAP_SIZE); //获取bypass映射的内存地址
 
@@ -161,7 +164,42 @@ void read_device(){
     work = 1;
 
     pthread_create(&event_thread, NULL, (void *(*)(void *))event_process, NULL);
+    while (inp != 'o')
+    {
+        inp = getchar();
+        switch (inp)
+        {
+        case 'w':
+            //read(c2h_fd, pData, 8*1024);
+
+            printf("Read data successful!\n");
+
+            for (int i = 0; i < 1024; i++)
+            {
+                printf("The data of address %d is %x \n", i, pData[i]);
+            }
+            break;
+
+        case 'e':
+            write_control(control_base, 0x0000, 0xFFFFFFFF);
+            break;
+
+        case 'r':
+            write_control(control_base, 0x0004, 0xFFFFFFFF);
+            break;
+        }
+    }
+    work = 0;
+
+    close(c2h_fd);
+    close(h2c_fd);
+    close(control_fd);
+    close(interrupt_fd);
+
+END:
+    exit(0);
 }
+
 
 //根据CPU创建和分配线程
 void ptd_create(pthread_t *arg, void *functionbody) {
@@ -241,9 +279,7 @@ void socket_ptd_create(){
 		}
 	}
 
-    printf("请输入客户端数量:\n");
-    scanf("%d", &client_num);
-    for(int i = 0; i < client_num; i++){
+    for(int i = 0; i < CLIENT_NUM; i++){
         printf("等待客户端连接...");
         acfd[i] = accept(socket_fd, (struct sockaddr *)&clientaddr[i], &len);
         if(acfd[i] < 0){
@@ -254,19 +290,56 @@ void socket_ptd_create(){
     }
 }
 
+void socket_send(){
+    for()
+}
+
 //数据分发
+char pack_send[CLIENT_NUM][PACK_SIZE];//
+int pack_count[CLIENT_NUM] = {0};//在data_send函数中需要在发送后将对应的count归零
+
 void *data_part(){
     char channle_id[8] = {'\0'};
+    int cpy_count = 0;
+    int ret;
+    char board_head[32];
 
+    memset(&pack_send, '\0', sizeof(pack_send));
     while(count == 0){}
+    while (part_alarm == -1){}
+
+    memcpy(board_head, pData, 32);
+    for (int i = 0; i < CLIENT_NUM; i++)
+    {
+        ret = send(acfd[i], board_head, 32, 0);
+        if (ret < 0)
+        {
+            printf("%d: Send board_head info failed!", i);
+            exit(1);
+        }
+    }
+    printf("Board_head info send successful!");
+    cpy_count++;
+
+    for (; cpy_count * 32 < MAP_SIZE; cpy_count++){
+        memcpy(channle_id, pData + cpy_count * 32, 32);
+        ret = atoi(channle_id);
+        if(ret < 20){
+            pack_count[ret%CLIENT_NUM]++;
+            memcpy(pack_send[ret%CLIENT_NUM] + pack_count[ret%CLIENT_NUM]*32, pData + cpy_count*32, 32);
+        }else{
+            printf("count: %d , cpy_count: %d :Data is discontinuous!", count, cpy_count);//这里需要做数据不连续的处理
+        }
+        cpy_count++;
+    }
+    cpy_count = 0;
+    part_alarm = -1;
+    //这里增加data_send发送函数
+
     while(1){
         while(part_alarm == -1){}
-        
-        if(count > 1){
-            for()
-        }else {
-            memcpy(channle_id, pData + 32)
-        }
+
+        part_alarm = -1;
     }
 
 

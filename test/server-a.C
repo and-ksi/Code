@@ -8,8 +8,6 @@
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
-#include <ostream>
-#include <iostream>
  
 #define BUF_SIZE  (8192)
 
