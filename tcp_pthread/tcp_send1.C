@@ -291,7 +291,11 @@ void socket_ptd_create(){
 }
 
 void socket_send(){
-    for()
+    char channle_id_num[CLIENT_NUM][4] = {0};
+    char frame_count[8] = {0};
+    char id[20] = {0};
+
+
 }
 
 //数据分发
