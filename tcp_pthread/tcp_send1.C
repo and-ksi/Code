@@ -35,6 +35,7 @@
 #define CPU_CORE        (4)//CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
 #define PACK_SIZE       (8*1024)
 #define CLIENT_NUM      (7)
+#define CHANNLE_NUM     (7)
 
 int c2h_fd ;
 int h2c_fd ;
@@ -48,8 +49,11 @@ int work;
 
 int port = 10000;
 int acfd[10];
-int ptd_alarm, part_alarm;
+int ptd_alarm, part_alarm = 0, send_alarm = 0;
 int count = 0;
+char pack_send[CLIENT_NUM][PACK_SIZE]; //
+int pack_count[CLIENT_NUM] = {0};      //在data_send函数中需要在发送后将对应的count归零
+int ptd_id;
 
 struct sockaddr_in clientaddr[10] = {0};
 pthread_t ptd[10];
@@ -130,7 +134,7 @@ void *event_process()
 }
 
 //打开设备并进行读取
-void read_device(){
+void *read_device(){
     char inp;
     control_fd = open_control("/dev/xdma0_bypass");    //打开bypass字符设备
     control_base = mmap_control(control_fd, BYPASS_MAP_SIZE); //获取bypass映射的内存地址
@@ -236,8 +240,39 @@ void ptd_create(pthread_t *arg, void *functionbody) {
     //printf("Id为%d的线程已创建完毕。", *arg);
 	
 	pthread_attr_destroy(&attr);//销除线程属性
+}
 
-    ptd_alarm = -1;
+//数据发送
+void *data_send()
+{
+    int id = ptd_id;
+    printf("Id为%d的线程已创建完毕。", id);
+    ptd_alarm = 0;
+
+    char buf[8] = {'\0'};
+    int ret;
+
+    while (1)
+    {
+        while (send_alarm == 0)
+        {
+        }
+        for (int i = 0; id + CPU_CORE * i < CLIENT_NUM; i++)
+        {
+            sprintf(buf, "%d", pack_count[id + CPU_CORE * i]);
+            memcpy(&pack_send[id + CPU_CORE * i] + 4, buf, 8);
+            ret = send(acfd[id + CPU_CORE * i], pack_send[id + CPU_CORE * i], PACK_SIZE, 0);
+            if (ret < 0)
+            {
+                printf("Count: %d : Send failed!", count);
+                exit(1);
+            }
+            memset(&pack_send[id + CPU_CORE * i], '\0', PACK_SIZE);
+            pack_count[id + CPU_CORE * i] = 0;
+        }
+        send_alarm = 0;
+    }
+    return NULL;
 }
 
 //socket和线程创建函数
@@ -271,9 +306,10 @@ void socket_ptd_create(){
     for(int i = 0; i < CPU_CORE - 1; i++) {
 		printf("创建第%d个线程...", i);
         ptd_alarm = 1;
-        ptd_create(&ptd[i], (void *)data_send);//这里根据需要更改
-		while(1) {
-			if(ptd_alarm < 0) {
+        ptd_id = i;
+        ptd_create(&ptd[i], (void *(*))data_send); //这里根据需要更改
+        while(1) {
+			if(ptd_alarm = 0) {
 				break;
 			}
 		}
@@ -290,18 +326,7 @@ void socket_ptd_create(){
     }
 }
 
-void socket_send(){
-    char channle_id_num[CLIENT_NUM][4] = {0};
-    char frame_count[8] = {0};
-    char id[20] = {0};
-
-
-}
-
 //数据分发
-char pack_send[CLIENT_NUM][PACK_SIZE];//
-int pack_count[CLIENT_NUM] = {0};//在data_send函数中需要在发送后将对应的count归零
-
 void *data_part(){
     char channle_id[8] = {'\0'};
     int cpy_count = 0;
@@ -310,7 +335,7 @@ void *data_part(){
 
     memset(&pack_send, '\0', sizeof(pack_send));
     while(count == 0){}
-    while (part_alarm == -1){}
+    while (part_alarm == 0 || send_alarm == 1){}
 
     memcpy(board_head, pData, 32);
     for (int i = 0; i < CLIENT_NUM; i++)
@@ -325,38 +350,53 @@ void *data_part(){
     printf("Board_head info send successful!");
     cpy_count++;
 
-    for (; cpy_count * 32 < MAP_SIZE; cpy_count++){
+    for (; cpy_count * 32 <= MAP_SIZE; cpy_count++){
         memcpy(channle_id, pData + cpy_count * 32, 32);
         ret = atoi(channle_id);
-        if(ret < 20){
+        if(ret <= CHANNLE_NUM){
             pack_count[ret%CLIENT_NUM]++;
             memcpy(pack_send[ret%CLIENT_NUM] + pack_count[ret%CLIENT_NUM]*32, pData + cpy_count*32, 32);
         }else{
-            printf("count: %d , cpy_count: %d :Data is discontinuous!", count, cpy_count);//这里需要做数据不连续的处理
+            printf("count: %d , cpy_count: %d :Data is discontinuous!", count, cpy_count);
+            //这里需要做数据不连续的处理
         }
         cpy_count++;
     }
     cpy_count = 0;
-    part_alarm = -1;
-    //这里增加data_send发送函数
+    part_alarm = 0;
+    send_alarm = 1;
 
     while(1){
-        while(part_alarm == -1){}
-
-        part_alarm = -1;
+        while (part_alarm == 0 || send_alarm == 1){}
+        for(; cpy_count * 32 <= MAP_SIZE; cpy_count++){
+            memcpy(channle_id, pData + cpy_count * 32, 32);
+            ret = atoi(channle_id);
+            if (ret <= CHANNLE_NUM)
+            {
+                pack_count[ret % CLIENT_NUM]++;
+                memcpy(pack_send[ret % CLIENT_NUM] + pack_count[ret % CLIENT_NUM] * 32, pData + cpy_count * 32, 32);
+            }
+            else
+            {
+                printf("count: %d , cpy_count: %d :Data is discontinuous!", count, cpy_count);
+                //这里需要做数据不连续的处理
+            }
+            cpy_count++;
+        }
+        part_alarm = 0;
+        send_alarm = 1;
+        cpy_count = 0;
     }
-
-
-
-
-    return NULL;
-}
-
-//数据发送
-void *data_send(){
     return NULL;
 }
 
 int main() {
+    pthread_t device_thread;
+    pthread_t part_thread;
+    pthread_create(&device_thread, NULL, (void *(*)(void *))read_device, NULL);
 
+    socket_ptd_create();
+    pthread_create(&part_thread, NULL, (void *(*)(void *))data_part, NULL);
+    pthread_join(device_thread, NULL);
+    return 0;
 }
