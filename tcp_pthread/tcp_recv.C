@@ -104,22 +104,22 @@ void *data_read(){
     
     while(1){
         while(recv_alarm == 0 || ana_alarm == 1);
-        memcpy(buf, pack_recv, 8);
+        memcpy(buf, pack_recved, 8);
         ret = atoi(buf);
         if(ret != recv_count){
             printf("recv_count: %d :Data recved ERROR!", recv_count);
             exit(1);
         }
         while(cpy_length < PACK_SIZE){
-            memcpy(buf, pack_recv + cpy_length + 32, 8);
+            memcpy(buf, pack_recved + cpy_length + 32, 8);
             channle_id[1] = atoi(buf);
             if(channle_id[0] != channle_id[1]){
                 part++;
             }
-            memcpy(buf, pack_recv + cpy_length + 8, 16);
+            memcpy(buf, pack_recved + cpy_length + 8, 16);
             ret = atoi(buf);
             cpy_length = cpy_length + 32;
-            memcpy(data_pack[part] + read_length, pack_recv + cpy_length, ret);
+            memcpy(data_pack[part] + read_length, pack_recved + cpy_length, ret);
             cpy_length = cpy_length + ret;
             read_length = read_length + ret;
             part = 0;
