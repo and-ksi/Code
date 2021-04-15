@@ -84,7 +84,7 @@ ADC_DATA adc_data;
 TDC_DATA tdc_data;
 
 typedef struct data_head{
-	char channle_id_num[4];
+	char channle_id_num[8];
 	char frame_count[8];
-	char id[20];
+	char id[16];
 }DATA_HEAD;
