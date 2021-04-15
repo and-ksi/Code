@@ -50,7 +50,7 @@ int acfd[10];
 int ptd_alarm, part_alarm = 0, send_alarm = 0;
 int count = 0;
 char pack_send[CLIENT_NUM][PACK_SIZE]; //
-int pack_length[CLIENT_NUM] = {0};      //在data_send函数中需要在发送后将对应的count归零
+long int pack_length[CLIENT_NUM];      //在data_send函数中需要在发送后将对应的count归零
 int ptd_id;
 
 struct sockaddr_in clientaddr[10] = {0};
@@ -123,9 +123,7 @@ void *event_process()
     while (work == 1)
     {
         read_event(interrupt_fd); //获取用户中断
-        while (part_alarm == 1)
-        {
-        }
+        while (part_alarm == 1);
         read(c2h_fd, pData, sizeof(pData));
         count++;
         part_alarm = 1;
@@ -251,7 +249,7 @@ void ptd_create(pthread_t *arg, void *functionbody)
 void *data_send()
 {
     int id = ptd_id;
-    printf("Id为%d的线程已创建完毕。", id);
+    printf("Id为%d的发送线程已创建完毕。", id);
     ptd_alarm = 0;
 
     char buf[8] = {'\0'};
@@ -259,13 +257,13 @@ void *data_send()
 
     while (1)
     {
-        while (send_alarm == 0)
+        while (send_alarm == 0);
         for (int i = 0; id + CPU_CORE * i < CLIENT_NUM; i++)
         {
             sprintf(buf, "%d", count);
             memcpy(pack_send[id + CPU_CORE * i], buf, 8);
-            sprintf(buf, "%d", pack_length[id + CPU_CORE * i]);
-            memcpy(pack_send[id + CPU_CORE * i] + 8, buf, 8);
+            sprintf(buf, "%ld", pack_length[id + CPU_CORE * i]);
+            memcpy(pack_send[id + CPU_CORE * i] + 8, buf, 16);
             ret = send(acfd[id + CPU_CORE * i], pack_send[id + CPU_CORE * i], PACK_SIZE, 0);
             if (ret < 0)
             {
@@ -318,13 +316,7 @@ void socket_ptd_create()
         ptd_alarm = 1;
         ptd_id = i;
         ptd_create(&ptd[i], (void *(*))data_send); //这里根据需要更改
-        while (1)
-        {
-            if (ptd_alarm = 0)
-            {
-                break;
-            }
-        }
+        while (ptd_alarm == 1);
     }
 
     for (int i = 0; i < CLIENT_NUM; i++)
@@ -344,76 +336,47 @@ void socket_ptd_create()
 void *data_part()
 {
     char channle_id[8] = {'\0'};
-    int cpy_length = 0;
+    int cpy_length;
     int ret;
     int frame_length;
-    char board_head[32];
     char buf[16];
 
     memset(&pack_send, '\0', sizeof(pack_send));
-    while (count == 0)
-    while (part_alarm == 0 || send_alarm == 1)
+    while (count == 0);
+    while (part_alarm == 0 || send_alarm == 1);
 
-    memcpy(board_head, pData, 32);
-    for (int i = 0; i < CLIENT_NUM; i++)
-    {
-        ret = send(acfd[i], board_head, 32, 0);
-        if (ret < 0)
-        {
-            printf("%d: Send board_head info failed!", i);
-            exit(1);
-        }
+    for(int i = 0; i < CLIENT_NUM; i++){
+        memcpy(pack_send[i] + 32, pData, 32);
+        pack_length[i] = 32;
     }
-    printf("Board_head info send successful!");
-    cpy_length = cpy_length + 32;
-
-    while(cpy_length < MAP_SIZE)
-    {
-        memcpy(channle_id, pData + cpy_length, 8);
-        if (memcmp("00000000", channle_id, 8))
-        {
-            printf("count: %d , cpy_length: %d :Data Error!", count, cpy_length);
-            break;
-        }
-        ret = atoi(channle_id);
-        if (ret <= CHANNLE_NUM)
-        {
-            memcpy(buf, pData + cpy_length + 16, 16);
-            ret = atoi(buf);
-
-            memcpy(pack_send[ret % CLIENT_NUM] + pack_length[ret % CLIENT_NUM], pData + cpy_length, 32*3 + ret);
-            pack_length[ret % CLIENT_NUM] = pack_length[ret % CLIENT_NUM] + ret + 32*3 + 32;
-        }
-        //这里需要做数据不连续的处理
-        cpy_length = cpy_length + 32*3 + ret;
-    }
-    cpy_length = 0;
-    part_alarm = 0;
-    send_alarm = 1;
+    cpy_length = 32;
 
     while (1)
     {
-        while (part_alarm == 0 || send_alarm == 1)
+        while (part_alarm == 0 || send_alarm == 1);
             while (cpy_length < MAP_SIZE)
             {
                 memcpy(channle_id, pData + cpy_length, 8);
-                if (memcmp("00000000", channle_id, 8))
-                {
-                    printf("count: %d , cpy_length: %d :Data Error!", count, cpy_length);
-                    break;
-                }
                 ret = atoi(channle_id);
+                if (ret == 0)
+                {
+                    if (memcmp("00000000", channle_id, 8))
+                    {
+                        printf("count: %d , cpy_length: %d :Data Error!", count, cpy_length);
+                        break;
+                    }
+                }
                 if (ret <= CHANNLE_NUM)
                 {
                     memcpy(buf, pData + cpy_length + 16, 16);
                     ret = atoi(buf);
 
-                    memcpy(pack_send[ret % CLIENT_NUM] + pack_length[ret % CLIENT_NUM], pData + cpy_length, 32 * 3 + ret);
-                    pack_length[ret % CLIENT_NUM] = pack_length[ret % CLIENT_NUM] + ret + 32 * 3 + 32;
+                    memcpy(pack_send[ret % CLIENT_NUM] + pack_length[ret % CLIENT_NUM] + 32, pData + cpy_length, 32 * 3 + ret);
+                    pack_length[ret % CLIENT_NUM] = pack_length[ret % CLIENT_NUM] + ret + 32 * 3;
+                    cpy_length = cpy_length + 32 * 3 + ret;
                 }
                 //这里需要做数据不连续的处理
                 //应该增加一种条件，即pData没有存储满时读取已存储部分
-                cpy_length = cpy_length + 32 * 3 + ret;
             }
         part_alarm = 0;
         send_alarm = 1;
