@@ -1,14 +1,12 @@
 #include <sys/time.h>
-#include <stdlib.h>
-#include <iostream>
+#include <stdio.h>
+#include <math.h>
 
-
-void data_product(){
-    struct timeval time1;
-    printf("%d", sizeof(time1));
+double float sinfun(){
+    double float
 }
 
 int main(){
-    data_product();
+
     return 0;
 }
