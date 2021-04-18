@@ -1,0 +1,286 @@
+void note旧内容(){
+	root filename 	//一个加号，如果有，直接运行，没有，编译
+				//两个加号，强制编译运行
+				
+	facr{}{}//分数表达
+
+	TF1 *fname("name","fbody",bin,end);//*返回指针，方便直接使用函数名字作图
+	fname->Draw();//指针绘图
+				//fname.Draw();当返回int值时使用fname作图
+				//	x.x		->具有普适性，同样可以运用于参数设置
+				//如efunc.SetParameter(0,0);
+				//当有两个变量时，在函数体后需分别标注两个变量的范围。并且使用TF2
+				//TF1可以不定义函数体，而使用多项式定义，如pol3代表函数体为最高次项为三次项的多项式
+
+	TH1F histogramsname/*h*/("h","title",bin num,start,end);
+
+	for (int i=0;i<1000;i++) {h.Fill(efunc.GetRandom());}//使用Getrandom()从efunc中获取随机数并且被Fill填充到H中
+
+	ifstream inp: double x;
+	inp.open("expo.dat");//使用文件填充直方图时，文件指针使用
+	while(inp>>x){h.Fill(x);}//尝试用random写入dat文件并用指针读出做直方图					！！！
+
+	root的一些全局指针	gROOT			ROOT系统入口点
+						gStyle			设置一些对象属性，如图表中文本、图例等等
+						gSystem			系统通用接口
+						gInterpreter	root解释器入口TCling
+
+	root中宏的结构使用：文件名应该与主函数名相同；.x name直接运行；.L name加载后可以直接使用函数名name();//宏后缀名一般为.C
+
+	!!!函数名不可以加空格，否则输出.C文件会报错
+
+	TCanvas("name""name",x size,y size);
+	如    auto c = new TCanvas("myCanvas","myCanvas",600,600);
+	auto*TGname =new TGraphErrors (pointsnum,x,y,xe,ye);//另一种指定文件名方式见下
+
+	!!!DrwaClone和Draw有很大的不同！！！
+
+	fname.SetParameter(0,a);//或者
+	fname.SetParameter(a,b);//可能有两种应用方式，上为第一个参量赋值，下同时为两个参量赋值，可能是和参数名的定义有关系
+
+	对于定义TCanas、TH1F等函数时，可以用两种办法：  //auto name = new Tfunction();
+												//Tfunction* name = new Tfunction();
+
+	TFile::Open("filename/dir_filename")//打开文件
+	Get("what")//发现内容
+	printf("%g",&)//%g   表示bai以%f%e中较短的输出宽du度输出单、双zhi精度实数，在指数小于-4或者dao大于等于精度时使用%e格式。
+	Fit("funcname","r");//r代表尽在函数取值范围内进行数值拟合
+
+	内存名.调用函数
+	地址->调用函数
+	Fit(地址/"内存名","option");//r时，代表仅在函数取值范围内进行拟合。
+							   //+rob=.75   表示仅取所有数据中百分之七十五的点为正常点进行拟合
+							   //Fit的各项options详见课程3.17fitMultiGraph
+
+	Draw("内存名","option");//a:auto		p:point
+
+	TCanvas *myc = new TCanvas("myc",
+	      "Fitting a MultiGraph of 3 TGraphErrors");//myc是内存名，但是另一个没有找到用处
+
+	TMultiGraph *mg=new TMultiGraph("mg",
+	      "TMultiGraph of 3 TGraphErrors");//这里在结果中作为标题
+
+	关于文字属性：(在课程目录)
+			TText*th1=new TText(0.33,0.165,"Left adjusted");
+			th1->SetTextAlign(11); //1左对齐2中间3右；1底对齐2中间3上
+			th1->SetTextSize(0.12);
+			th1->Draw();
+
+	文件的保存
+	  TFile out_file("filename","RECREATE");//如果有，则直接打开，没有就创建一个文件
+	  h.Write();
+	  out_file.Close();
+	文件的打开和读取
+	  TFile*in_file=new TFile("filename");
+	  TH1F*h=(TH1F*)in_file->Get("filename");
+	  h->Draw();
+
+	new TBrowser 打开文件管理器
+
+	创建并且初始化数组
+		TNtuple cond_data("con_data","Example N-Tuple","C1,C2,C3,...");
+	填充数组
+		cond_data.Fill(c1,c2,c3,...);
+	写入文件
+		cond_data.Write();
+		filezhizhen.Close
+	数据文件可以直接被root指令加载，使用数组指针，Draw("c1:c2")class名称，即可绘制数据图表,即数据相关的数据，如：
+	cond_data->Draw("Current:Potential")	//两者数据的相关性图表
+	cond_data->Draw("Current:Potential","Temperature<270")	//两者数据相关性，且Tem小于...
+	cond_data->Draw("Current/Potential:Temperature")
+}
+void 难以分类(){
+	//指针使用->，变量采用.
+	Get("what")//发现内容
+	zhizhen->getArgs();//得到参数？
+	//可以在定义类的变量时，在末尾加//!控制是否保存在root文件中
+	sprintf(etype,"type%d",ev%5);//sprintf字符串格式化命令，即将type%d，%d为ev%5的值，赋给etype
+	Int_t npx = (Int_t)(gRandom->Rndm(1)*15);//强制转换为整型
+	gBenchmark->Start("hvector");//这个函数会显示出运行速度、状态等？
+}
+void 类class的说明(){
+	//类是用户自定义的类型，如一下一个简单的类的定义：
+	class Student{
+	public:
+   		char *name;//成员变量
+    	int age;
+    	float score;//成员函数
+    	void say(){
+        	cout<<name<<"的年龄是"<<age<<"，成绩是"<<score<<endl;
+    	}
+	};
+	//类只是一个模板编译后不占用内存空间，所以在定义类时不能对成员变量进行初始化，因为没有地方
+	//存储数据。只有在创建对象以后才会给成员变量分配内存，这个时候就可以赋值了。
+	//有了类以后，就可以创建对象了，例如
+	class Student LiLei;//创建对象,class可以省略。
+						//也可以创建对象数组，每一个元素都是该class的对象
+	int a;//定义整型变量
+	//创建对象后，可以使用.号访问成员变量和成员函数，如下
+	#include <iostream>
+	using namespace std;//类通常定义在函数外面
+	class Student{
+	public://类包含的变量
+		char *name;
+		int age;
+		float score;//类包含的函数
+		void say(){
+			cout<<name<<"的年龄是"<<age<<"，成绩是"<<score<<endl;
+		}
+	};
+	int main(){//创建对象
+		Student stu;
+		stu.name = "小明";
+		stu.age = 15;
+		stu.score = 92.5f;
+		stu.say();
+		return 0;
+	}
+}
+void 关于TFile(){
+	TFile::Open("filename/dir_filename")//打开文件
+	TFile out_file("filename","RECREATE");//如果有，则直接打开，没有就创建一个文件
+	h.Write();//将h写入文件，没有使用指针时，可以在写入后自动关闭
+	out_file.Close();//将指针out_file代表的文件关闭
+	TFile*in_file=new TFile("filename");//定义一个文件指针，指向一个文件名
+	in_file.Close();
+}
+void 关于TTree(){
+	TTree *tree = new TTree("tree","treelibrated tree");
+	//定义一个新的tree，地址名和内存名均为tree，其title为treelibrated tree
+	//调用class作为tree一部分时，一定要先定义指针变量
+	Event *e = n ew Event;//定义了一个Event类的指针e||显然是一个自定义类
+	tree->Branch("event",&e);//tree中产生一个Branch，名称为任意(event)
+	//tree可以直接用Fill()填充，但是一定是tree的branch来填充
+	t1.Branch("px",&px,"px/F");//在t1的tree中创建Branch，分别命名、地址、以及
+							  						 //用/FDI分别定义浮点、双精度、整型
+							  						 //当变量为数组时，不需要取地址符，因为数组本身就是地址
+							 						   //另外最后定义类型可以省略
+	tree->Fill();
+	tree->StartViewer();//打开一个界面，便捷显示
+	//详细实例见tree0.C
+	TTree *t1 = (TTree*)f->Get("t1");//在定义的TFile的指针f中查找名为t1的函数经过
+																	 //指针变换赋予新的TTree类型t1，注意两个t1的区别
+	t1->SetBranchAddress("px",&px);//将新定义的变量地址和tree中的变量连接
+								   //这是用t1读出数据的重要操作
+	//当读取t1中的数据时，举例如下
+	for (Long64_t i=0;i<nentries;i++) {
+    t1->GetEntry(i);//取得t1中第i组数据，这时以上定义的变量内就有了数据了
+    hpx->Fill(px);
+    hpxpy->Fill(px,py);
+
+    t1.Write();//后结束函数，当写入并保存tree header后，程序会自动关闭文件
+    t1->ResetBranchAddresses();// Allow to use the TTree after the end of the function.
+    new TBrowser();
+    t1->StartViewer();
+    t2.Branch("track",&gstep,8000,1);
+    //Branck(branchname,&p_object,bufsize,splitlevel);		在tree中创建branch，将地址和branch连接，bufusize
+    //指8000次一次保存，splitlevel 打开级别，1为仅打开tree，99为一项一项打开
+    ///////////////////////////////////////////////////////////////////
+    TChain in_chain("cond_data");
+	in_chain.Add("conductivity_experiment*.root"); // add files,
+	                                               // wildcards work
+	// define variables and assign them to the corresponding branches
+	float pot, cur, temp, pres;
+	in_chain.SetBranchAddress("Potential", &pot);//branch和变量地址似乎可以一对多
+	in_chain.SetBranchAddress("Current", &cur);
+	in_chain.SetBranchAddress("Temperature", &temp);
+	in_chain.SetBranchAddress("Pressure", &pres);
+	//////////////////////////////////////////////////////////////////
+	//在tree中创建数量可变的数组，先定义最大数量的数组，然后创建brach时引用变量作为数组定义
+	t3->Branch("ntrack",&ntrack,"ntrack/I");//定义整型
+	t3->Branch("stat",stat,"stat[ntrack]/I");//将整型应用到数组中，前已经定义数组int stat[max];
+    //定义friendtree时，两个tree要有一一对应的关系
+	t3->AddFriend("t3f","tree3f.root");//向tree添加friendtree，指定ftree的名字和文件名
+    								   //tree名和文件名需引号，指针不需引号
+	//在使用branch之前，需要将branch中的变量clear
+	vpx.clear();
+	vpx.emplace_back(px);//将px数据进行压缩准备到vpx中	(px为浮点	vpx为branch)
+	TTree *t; f->GetObject("tvec",t);//生成一个tree的指针，使用getobject将tree的名字和指针连在一起
+	h->Fill(vpx->at(j));//也可以用h->Fill((*vpx)[j]);   用h填充vpx数组
+	//使用at函数将序号对应的值调出来
+}
+void 利用TTree生成框架(){
+	//三种方法:
+	t1->MakeClass("TReadTree");//生成一个.h和一个.C文件 			双引号为class名字
+	t1->MakeSelector("Sel");//同上相似，差异，这个为完整的分析代码，代码准备好后打开不同的root也可以调用
+	t1->MakeCode("ReadTree.C");
+}
+void 关于TCanvas(){
+	TCanvas("name""name",x size,y size);//两种定义方式如下
+	auto c = new TCanvas("myCanvas","myCanvas",600,600);
+	TCanvas *c1 = new TCanvas("c1","Dynamic Filling Example",200,10,700,500);//后面两个数字意义不明
+}
+void 随机数(){
+	gRandom->Rannor(px,py);//Rannor是一个在二维高斯曲面中取随机数的函数
+						   //gRandom为调用随机函数的头？
+	pot=gRandom->Uniform(0.,10.)*gRandom->Gaus(1.,0.01);//直观的应用
+	//除了Gaus函数，还有landau函数等
+	Float_t random = gRandom->Rndm(1);//产生0-1的随机数
+}
+void 关于const(){
+	//const的作用
+	//一、修饰普通类型的变量
+	const int a=7;//a值不可被改变
+	//二、const修饰指针变量
+	//A：const修饰指针或者指针指向的内容，被指向即为不可变量；若指向两者，则均为不可变量
+	const int *p=8;//指针指向的内容8不可变，左定值，const位于*左边
+	//B：
+	int a =8;
+	int* const p =&a;
+	*p=9;//对于const指针p，其指向的内存不可以被改变，但是内容可以改变。右定向，const位于*右边
+	//C：对于同时指向两者
+	int a=8;
+	const int* const p=&a;//这时，const p的指向的内容和内存地址都已经固定，不可以改变
+	//三、const参数传递和函数返回值
+	//A：值传递的const修饰传递，一般这种情况下不需要const修饰，因为函数会自动产生临时变量赋值实参值
+	void Cpf(const int a)
+	//B：当const参数为指针时，可以防止指针被意外篡改
+	void Cpf(int *const a)
+	//C：自定义类型的参数传递，需要临时对象复制参数，对于临时对象的构造函数，比较浪费时间，因此采用const外加引用传递
+	//   的方法。并且对于一般的int,double等内置类型，不采用引用的传递方式
+	//https://www.runoob.com/w3cnote/cpp-const-keyword.html
+}
+void 枚举enum和typedef(){
+	//枚举定义格式
+	enum 枚举名 {枚举元素1,2,3,4};
+	//默认情况下第一个元素为0，往后逐次加一，可以自定义中间元素任意一个，往后逐次加一，往前从0开始
+	//枚举的定义方式有三种
+	//A：先定义枚举类型，再定义枚举变量
+	enum Day{Mon=1,TUE,...};
+	enum Day day;
+	//B：定义枚举类型同时定义枚举变量
+	enum DAY{MON=1,TUE,...}day;
+	//C：省略枚举名称，直接定义枚举变量
+	enum {MON=1,TUE,...}day;
+
+	//typedef可以为一种类型取一个新的名字
+	//用法类似于class。格式如下
+	typedef struct Books
+	{
+		char title[50];
+		char autor[50];
+		int book_id;
+	}Book;
+}
+void 问题(){
+	//inp指针的具体用法
+	//Draw&DrawClone的详细区别
+	zhizhen->getArgs();
+		my_tuple->GetEntry(irow);//取第irow个数组
+        row_content = my_tuple->GetArgs();//取出数组到row_content中
+    /////////////////////////////////////////////////////////
+    //通过for循环创建多个root数据文件
+    // for i in 0 1 2 3 4 5; \\
+	// do root -l -x -b -q \\
+	// "write_ntuple_to_file.cxx \\
+	// (\"conductivity_experiment_${i}.root\", 100)"; \\
+	//  done
+	/////////////////////////////////////////////////////////
+	if (i && (i%kUPDATE) == 0) {//每过1k次，更新一次数据
+		if (i == kUPDATE) hpx->Draw();
+		c1->Modified();//告诉Canvas已经修改数据
+		c1->Update();
+		if (gSystem->ProcessEvents())//接收指令输入
+		break;
+	}
+}
