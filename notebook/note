@@ -1,0 +1,31 @@
+Linux共享内存:
+    主要函数及头文件:
+    #include <sys/mman.h>
+    int shm_open(const char *name, int oflag, mode_t mode);
+    void *mmap(void *addr, size_t length, int prot, int flags,int fd, off_t offset);
+    int munmap(void *addr, size_t length);
+    int shm_unlink(const char *name);
+    int ftruncate(int fd, off_t length);
+
+    shm_open相似open,但是固定从/dev/shm/打开文件,
+    name为文件名;
+    oflag：打开的文件操作属性：O_CREAT、O_RDWR、O_EXCL的按位或运算组合
+    mode：文件共享模式，例如 0777
+    成功返回fd>0，  失败返回fd<0
+
+    mmap将文件映射到内存中,成功返回指针,失败为NULL
+    addr：要将文件映射到的内存地址，一般应该传递NULL来由Linux内核指定。
+    length：要映射的文件数据长度。
+    prot：映射的内存区域的操作权限（保护属性），包括PROT_READ、PROT_WRITE、PROT_READ|PROT_WRITE
+    flags：标志位参数，包括：MAP_SHARED、MAP_PRIVATE与MAP_ANONYMOUS。
+            MAP_SHARED:  建立共享，用于进程间通信，如果没有这个标志，则别的进程即使能打开文件，也看不到数据。
+            MAP_PRIVATE: 只有进程自己用的内存区域
+            MAP_ANONYMOUS:匿名映射区
+    fd：   用来建立映射区的文件描述符，用 shm_open打开或者open打开的文件。
+    offset：映射文件的偏移，应该按4096字节对齐
+
+    munmap取消内存映射，addr是由mmap成功返回的地址，length是要取消的内存长度，munmap 只是将映射的内存从进程的地址空间撤销，如果不调用这个函数，则在进程终止前，该片区域将得不到释放。
+
+    unlink删除/dev/shm目录的文件，shm_unlink 删除的文件是由shm_open函数创建于/dev/shm目录的。
+
+    ftruncate重置文件大小。任何open打开的文件都可以用这个函数，不限于shm_open打开的文件。

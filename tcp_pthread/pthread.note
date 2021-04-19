@@ -63,15 +63,16 @@ typedef struct frame_head
 	char error[6];
 	char Ftype[2];
 	char length[16];
-	char timestamp_H[32];
-	char timestamp_L[32];
+	//char timestamp_H[32];
+	//char timestamp_L[32];
+	char timestamp[64];
 } FRAME_HEAD;
 
 typedef struct adc_data
 {
 	FRAME_HEAD adc_head;
-	char adc_data1[16];
-	char adc_data2[16];
+	//char adc_data1[16];
+	//char adc_data2[16];
 } ADC_DATA;
 
 typedef struct tdc_data
