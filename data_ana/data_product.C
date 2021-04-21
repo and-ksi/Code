@@ -5,13 +5,13 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #define PI (acos(-1))
 #define CHANNEL_NUM (8)
 #define MMAP_SIZE (8192)
+#define SUBDATA_SIZE (1024)
 
 typedef struct board_head
 {
@@ -34,12 +34,13 @@ typedef struct frame_head
 
 BOARD_HEAD board_head;
 FRAME_HEAD frame_head;
-pthread_t ptd[CHANNEL_NUM];
 int channel_id;
-bool interrupt = 0;
+int *signal;
 char *data;
-int data_length;
-char subdata[1024];
+int data_length, sub_length;
+char subdata[SUBDATA_SIZE];
+long int time0, starttime, time1;
+char buf[32];
 
 double sinfunc(double x, int a){
     double f = 5*sin(PI*2e6*x + a);
@@ -49,7 +50,7 @@ double sinfunc(double x, int a){
 void mmap_open(){
     int fd = shm_open("shm01", O_CREAT | O_RDWR, 0777);
     if(fd < 0){
-        printf("Share mem open failed!");
+        printf("Share memery open failed!");
         exit(1);
     }
     ftruncate(fd, MMAP_SIZE);
@@ -62,46 +63,78 @@ void mmap_open(){
     memset(data, '0', MMAP_SIZE);
 }
 
-int data_generate(int id){
-    struct timeval time0, starttime;
-    double time;
-    int count = 0;
-
-    gettimeofday(&starttime, 0);
-    while(1){
-        gettimeofday(&time0, 0);
-        time = time0.tv_sec - starttime.tv_sec + (time0.tv_usec - starttime.tv_usec)*1e-6;
-        while(sinfunc(time, 0) >= 1){
-            sprintf(subdata + count * 16, "%4d%12.11f", id, sinfunc(time, 0));
-            count++;
-        }
+void signal_mmap_open(){
+    int fd = shm_open("shm02", O_CREAT | O_RDWR, 0777);
+    if (fd < 0)
+    {
+        printf("Share memery open failed!");
+        exit(1);
     }
-    return (count + 1) / 2;
+    ftruncate(fd, 4);
+    signal = (int *)mmap(NULL, 4, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    *signal = 0;
+}
+
+void subdata_generate(int id){
+    double time, ret;
+
+    memset(subdata, '0', SUBDATA_SIZE);
+    time = time0 * 1e-6;
+
+    sprintf(buf, "%ld", time0);
+    memcpy(frame_head.timestamp, buf, strlen(buf));
+    memset(buf, '0', 32);
+    while((ret = sinfunc(time, id)) >= 1){
+        sprintf(buf, "%12.11f", ret);
+        memcpy(subdata + sub_length + 4, buf, 12);
+        memset(buf, '0', 32);
+        sub_length += 16;
+        time0++;
+    }
+    if(time0 % 2 == 1){
+        sub_length += 16;
+    }
+    sprintf(buf, "%016d", sub_length);
+    memcpy(frame_head.length, buf, 16);
+    memset(buf, '0', 32);
+    sub_length += 32 * 3;
 }
 
 void channel_generate(){
-    int id = channel_id;
-    channel_id++;
-    if(channel_id < CHANNEL_NUM){
-        pthread_create(&ptd[channel_id], 0, (void *(*)(void *))channel_generate, NULL);
-    }
-
-    sprintf(frame_head.channle_id, "%d", id);
-    memcpy(frame_head.error, "NULL", 4);
-    memcpy(frame_head.Ftype, "00", 2);
-    data_length = 0;
-
-
-    
-    
-}
-
-int main(){
-    memset(&board_head, '\0', sizeof(board_head));
-    memset(&frame_head, '\0', sizeof(frame_head));
+    memset(&board_head, '0', sizeof(board_head));
+    memset(&frame_head, '0', sizeof(frame_head));
 
     memcpy(board_head.board_addr, "99999999", 8);
     channel_id = 0;
+    data_length = 32;
+    time0 = 0;
+
+    while(*signal != 4){
+        if (channel_id = CHANNEL_NUM)
+            channel_id = 0;
+        memset(buf, '0', 32);
+        memset(frame_head.error, '1', 6);
+        memset(frame_head.Ftype, '2', 2);
+        sprintf(buf, "%08d", channel_id);
+        memcpy(frame_head.channle_id, buf, 8);
+        memset(buf, '0', 32);
+        sub_length = 0;
+
+        subdata_generate(channel_id);
+        if((MMAP_SIZE - data_length) <= sub_length){
+            
+        }
+
+        memcpy(data + data_length, &frame_head, 32 * 3);
+        memcpy(data + data_length, subdata, sub_length);
+
+        channel_id++;
+        memset(&frame_head, '0', sizeof(frame_head));
+    }
+}
+
+int main(){
+    
 
 
 

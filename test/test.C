@@ -36,12 +36,12 @@ int main(){
 #include <string.h>
 
 int main(){
-    int a = 4/5;
+    int a = 4;
     float b;
     b = 1.0/3.0;
     char buf[20];
     memset(&buf, '\0', 20);
-    printf("a = %d, b = %f \n", a, b);
-    sprintf(buf, "%f", b);
+    printf("a = %08d, b = %f \n", a, b);
+    sprintf(buf, "%*.11f", 12, b);
     printf("%s\n", buf);
 }
