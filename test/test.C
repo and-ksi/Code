@@ -37,6 +37,7 @@ int main(){
 
 int main(){
     int a = 4;
+    a = 3;
     float b;
     b = 1.0/3.0;
     char buf[20];
