@@ -141,6 +141,7 @@ void *channel_generate(){
         channel_id++;
         memset(&frame_head, '0', sizeof(frame_head));
     }
+    return NULL;
 }
 
 int main(){
@@ -153,7 +154,7 @@ int main(){
     pthread_create(&ptd, 0, (void *(*)(void *))channel_generate, 0);
 
     while(sig != '0'){
-        scanf("%s", sig);
+        sig = getchar();
         switch (sig)
         {
         case '1':

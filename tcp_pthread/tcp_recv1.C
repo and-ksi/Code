@@ -40,7 +40,7 @@ char data_pack[2][PACK_SIZE];
 
 void *pack_recv()
 {
-    printf("Socket接收线程已创建!");
+    printf("Socket接收线程已创建!\n");
     ptd_alarm = 1;
 
     int ret;
@@ -81,11 +81,12 @@ void *pack_recv()
         recv_count++;
         recv_alarm = 1;
     }
+    return NULL;
 }
 
 void *data_analys()
 {
-    printf("Ana 线程已创建!");
+    printf("Ana 线程已创建!\n");
     ptd_alarm = 1;
 
     BOARD_HEAD board_head;
@@ -107,7 +108,7 @@ void *data_analys()
     memcpy(buf[1], data_pack + 8, 8);
     memcpy(buf[2], data_pack, 2);
     memcpy(buf[3], data_pack + 18, 14);
-    printf("Board INFO: \nBoard type:%s \nBoard addr:%s\nBoard Ftype:%s\nBoard Error:%s",
+    printf("Board INFO: \nBoard type:%s \nBoard addr:%s\nBoard Ftype:%s\nBoard Error:%s\n",
            buf[0], buf[1], buf[2], buf[3]);
     memset(buf, '\0', sizeof(buf));
     length = 32;
@@ -193,9 +194,9 @@ int main(){
 
     pthread_t recv_ptd, ana_ptd;
     ptd_alarm = 0;
-    ptd_create(&recv_ptd, 0, pack_recv);
+    ptd_create(&recv_ptd, 0, (void *(*))pack_recv);
     while(ptd_alarm == 0);
-    ptd_create(&ana_ptd, 0, data_analys);
+    ptd_create(&ana_ptd, 0, (void *(*))data_analys);
     while (ptd_alarm == 0);
 
     while (sig != '0')

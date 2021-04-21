@@ -14,7 +14,7 @@
 #define MMAP_SIZE (8 * 1024)
 #define CPU_CORE (4) //CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
 #define PACK_SIZE (2 * 1024)
-#define CLIENT_NUM (7)
+#define CLIENT_NUM (1)
 #define CHANNLE_NUM (8)
 
 typedef struct board_head
@@ -279,7 +279,7 @@ int main(){
     signal_mmap_open();
 
     socket_ptd_create();
-    ptd_create(&part_ptd, -1, data_part);
+    ptd_create(&part_ptd, -1, (void *(*))data_part);
 
     while(sig != '0'){
         sig = getchar();
@@ -289,7 +289,7 @@ int main(){
             while(send_alarm == 1);
             sig = '0';
             break;
-    }
+        }
     global_alarm = 1;
     close(data_fd);
     close(signal_fd);
@@ -298,4 +298,5 @@ int main(){
     }
     close(socket_fd);
     return 0;
+    }
 }
