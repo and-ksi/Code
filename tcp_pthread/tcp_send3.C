@@ -10,13 +10,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define PI (acos(-1))
 #define CHANNEL_NUM (8)
 #define MMAP_SIZE (8 * 1024)
 #define CPU_CORE (4) //CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
-#define PACK_SIZE (8 * 1024)
+#define PACK_SIZE (2 * 1024)
 #define CLIENT_NUM (7)
-#define CHANNLE_NUM (7)
+#define CHANNLE_NUM (8)
 
 typedef struct board_head
 {
@@ -147,7 +146,7 @@ void *data_send(){
         while (send_alarm == 0);
         for (int i = 0; (part = id + CPU_CORE * i) < CLIENT_NUM; i++)
         {
-            ret = send(acfd[part], pack_send[part], pack_length[part], 0);
+            ret = send(acfd[part], pack_send[part], PACK_SIZE, 0);
             if (ret < 0)
             {
                 printf("第%d次发送 , 线程id: %d : Send failed!", count, id);
@@ -218,7 +217,7 @@ void *data_part()
     printf("Part 线程已创建!");
     ptd_alarm = 0;
 
-    char channle_id[8] = {'0'};
+    char channle_id[9] = {'\0'};
     int cpy_length;
     int ret;
     int frame_length;
@@ -246,9 +245,9 @@ void *data_part()
             ret = atoi(channle_id);
             if (ret == 0)
             {
-                if (memcmp(zero_buf, data + cpy_length, 32))
+                if (!memcmp(zero_buf, data + cpy_length, 32))
                 {
-                   ret = CHANNEL_NUM;
+                   break;
                 }
             }
             if (ret < CHANNLE_NUM)
@@ -283,18 +282,15 @@ int main(){
     ptd_create(&part_ptd, -1, data_part);
 
     while(sig != '0'){
-        scanf("%s", sig);
+        sig = getchar();
         switch (sig)
         {
         case '1':
             while(send_alarm == 1);
             sig = '0';
             break;
-        
-        default:
-            break;
-        }
     }
+    global_alarm = 1;
     close(data_fd);
     close(signal_fd);
     for(int i = 0; i < CLIENT_NUM; i++){
