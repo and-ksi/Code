@@ -1,4 +1,5 @@
 Linux共享内存:
+	https://blog.csdn.net/ababab12345/article/details/102931841
     主要函数及头文件:
     #include <sys/mman.h>
     int shm_open(const char *name, int oflag, mode_t mode);
@@ -31,6 +32,7 @@ Linux共享内存:
     ftruncate重置文件大小。任何open打开的文件都可以用这个函数，不限于shm_open打开的文件。
 
     示例程序:
+    //write 端
     #include <stdio.h>
     #include <sys/types.h>
     #include <sys/stat.h>
@@ -81,3 +83,42 @@ Linux共享内存:
  
         return 0;
     }
+
+    //read端
+    #include <stdio.h>
+	#include <stdlib.h>
+	#include <sys/mman.h>
+	#include <string.h>
+	#include <fcntl.h>
+	#include <sys/stat.h>
+	#include <sys/types.h>
+	#include <unistd.h>
+	
+	#define MMAP_DATA_SIZE 1024
+	
+	int main(int argc,char * argv[])
+	{
+        char * data;
+        int fd = shm_open("shm-file0001", O_RDWR, 0777);
+        if(fd < 0)
+        {
+                printf("error open shm object\n");
+                return -1;
+        }
+        
+        data = (char*)mmap(NULL, MMAP_DATA_SIZE, PROT_READ, MAP_SHARED, fd, 0);
+        if (!data) {
+                printf("mmap failed!\n");
+                close(fd);
+                return -1;
+        }
+ 
+        printf(data);
+ 
+        munmap(data,MMAP_DATA_SIZE);
+ 
+        close(fd);
+        getchar();
+ 
+        return 0;
+	}
