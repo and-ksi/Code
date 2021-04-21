@@ -1,9 +1,11 @@
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <math.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -42,9 +44,15 @@ int *signal; //4:stop    0:write     1:wait for read
 char *data;
 char buf[32];
 int data_fd, signal_fd;
+int socket_fd;
 int port = 10000;
 int acfd[10];
 char pack_send[CLIENT_NUM][PACK_SIZE]; //每个客户端对应的待发送数据包
+int ptd_alarm = 0, send_alarm = 0, global_alarm = 0;
+int ptd_id, count;
+int pack_length[CLIENT_NUM] = {0};
+struct sockaddr_in clientaddr[10] = {0};
+pthread_t ptd[10];
 
 void mmap_open(){
     data_fd = shm_open("shm01", O_CREAT | O_RDWR, 0777);
@@ -81,13 +89,9 @@ void signal_mmap_open()
 }
 
 //根据CPU创建和分配线程
-void ptd_create(pthread_t *arg, void *functionbody)
+void ptd_create(pthread_t *arg, int k, void *functionbody)
 {
     int ret;
-
-    cpu_set_t cpusetinfo;
-    CPU_ZERO(&cpusetinfo);
-    CPU_SET((CPU_CORE - 1 - *arg), &cpusetinfo); //将core1加入到cpu集中,同理可以将其他的cpu加入
 
     pthread_attr_t attr;
 
@@ -97,6 +101,20 @@ void ptd_create(pthread_t *arg, void *functionbody)
         perror("Init attr fail");
         exit(1);
     }
+
+    if(k != -1){//k为-1时不使用核心亲和属性
+        cpu_set_t cpusetinfo;
+        CPU_ZERO(&cpusetinfo);
+        CPU_SET((CPU_CORE - 1 - k), &cpusetinfo); //将core1加入到cpu集中,同理可以将其他的cpu加入
+
+        ret = pthread_attr_setaffinity_np(&attr, sizeof(cpusetinfo), &cpusetinfo);
+        if (ret < 0)
+        {
+            perror("Core set fail");
+            exit(1);
+        }
+    }
+
     /* ret = pthread_attr_setscope(&attr, PTHREAD_SCOPE_PROCESS);//PTHREAD_SCOPE_SYSTEM绑定;PTHREAD_SCOPE_PROCESS非绑定
 	if(ret < 0) {
 		perror("Setscope fail");
@@ -108,12 +126,6 @@ void ptd_create(pthread_t *arg, void *functionbody)
         perror("Detached fail");
         exit(1);
     }
-    ret = pthread_attr_setaffinity_np(&attr, sizeof(cpusetinfo), &cpusetinfo);
-    if (ret < 0)
-    {
-        perror("Core set fail");
-        exit(1);
-    }
 
     pthread_create(arg, &attr, (void *(*)(void *))functionbody, NULL);
     //printf("Id为%d的线程已创建完毕。", *arg);
@@ -122,5 +134,172 @@ void ptd_create(pthread_t *arg, void *functionbody)
 }
 
 void *data_send(){
-    
+    int id = ptd_id;
+    printf("Id为%d的发送线程已创建完毕。", id);
+    ptd_alarm = 0;
+
+    char buf[8] = {'\0'};
+    int ret;
+    int part;
+
+    while (!global_alarm)
+    {
+        while (send_alarm == 0);
+        for (int i = 0; (part = id + CPU_CORE * i) < CLIENT_NUM; i++)
+        {
+            ret = send(acfd[part], pack_send[part], pack_length[part], 0);
+            if (ret < 0)
+            {
+                printf("第%d次发送 , 线程id: %d : Send failed!", count, id);
+                exit(1);
+            }
+            memset(&pack_send[part], '0', PACK_SIZE);
+        }
+        send_alarm = 0;
+    }
+    return NULL;
+}
+
+//socket和线程创建函数
+void socket_ptd_create()
+{
+    int ret;
+    socklen_t len;
+
+    struct sockaddr_in localaddr = {0};
+    localaddr.sin_family = AF_INET;
+    localaddr.sin_port = htons(port);
+    localaddr.sin_addr.s_addr = INADDR_ANY;
+
+    socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_fd < 0)
+    {
+        printf("Socket fail!\n");
+        exit(1);
+    }
+    ret = bind(socket_fd, (struct sockaddr *)&localaddr, sizeof(localaddr));
+    if (ret < 0)
+    {
+        printf("Bind fail!\n");
+        exit(1);
+    }
+    ret = listen(socket_fd, 10);
+    if (ret < 0)
+    {
+        printf("Listen fail!\n");
+        exit(1);
+    }
+
+    for (int i = 0; i < CPU_CORE - 1; i++)
+    {
+        printf("创建第%d个线程...", i);
+        ptd_alarm = 1;
+        ptd_id = i;
+        ptd_create(&ptd[i], ptd_id, (void *(*))data_send);
+        while (ptd_alarm == 1);
+    }
+
+    for (int i = 0; i < CLIENT_NUM; i++)
+    {
+        printf("等待客户端连接...");
+        acfd[i] = accept(socket_fd, (struct sockaddr *)&clientaddr[i], &len);
+        if (acfd[i] < 0)
+        {
+            perror("Accept fail");
+            exit(1);
+        }
+        printf("第%d个客户端已连接!", i); //希望能够显示连接的客户端地址
+    }
+}
+
+//数据分发
+void *data_part()
+{
+    printf("Part 线程已创建!");
+    ptd_alarm = 0;
+
+    char channle_id[8] = {'0'};
+    int cpy_length;
+    int ret;
+    int frame_length;
+    char zero_buf[32];
+    int part;
+
+    memset(&pack_send, '0', sizeof(pack_send));
+    memset(zero_buf, '0', 32);
+
+    while (*signal == 0 || send_alarm == 1);
+
+    for (int i = 0; i < CLIENT_NUM; i++)
+    {
+        memcpy(pack_send[i] + 32, data, 32);
+        pack_length[i] = 32;
+    }
+    cpy_length = 32;
+
+    while (!global_alarm)
+    {
+        while (*signal == 0 || send_alarm == 1);
+        while (cpy_length < MMAP_SIZE)
+        {
+            memcpy(channle_id, data + cpy_length, 8);
+            ret = atoi(channle_id);
+            if (ret == 0)
+            {
+                if (memcmp(zero_buf, data + cpy_length, 32))
+                {
+                   ret = CHANNEL_NUM;
+                }
+            }
+            if (ret < CHANNLE_NUM)
+            {
+                memcpy(buf, data + cpy_length + 16, 16);
+                ret = atoi(buf);
+                part = ret % CLIENT_NUM;
+
+                memcpy(pack_send[part] + pack_length[part], data + cpy_length, 32 * 3 + ret);
+                pack_length[part] += ret + 32 * 3;
+                cpy_length =+ 32 * 3 + ret;
+            }
+            //这里需要做数据不连续的处理
+            //应该增加一种条件，即pData没有存储满时读取已存储部分
+        }
+        memset(data, '0', MMAP_SIZE);
+        *signal = 0;
+        send_alarm = 1;
+        cpy_length = 0;
+    }
+    return NULL;
+}
+
+int main(){
+    char sig;
+    pthread_t part_ptd;
+
+    mmap_open();
+    signal_mmap_open();
+
+    socket_ptd_create();
+    ptd_create(&part_ptd, -1, data_part);
+
+    while(sig != '0'){
+        scanf("%s", sig);
+        switch (sig)
+        {
+        case '1':
+            while(send_alarm == 1);
+            sig = '0';
+            break;
+        
+        default:
+            break;
+        }
+    }
+    close(data_fd);
+    close(signal_fd);
+    for(int i = 0; i < CLIENT_NUM; i++){
+        close(acfd[i]);
+    }
+    close(socket_fd);
+    return 0;
 }
