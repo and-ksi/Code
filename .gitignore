@@ -10,3 +10,4 @@ data_ana/data_product
 speed_test/tcp_speeds.log
 tcp_pthread/send
 tcp_pthread/recv
+data_ana/a.out

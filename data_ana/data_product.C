@@ -147,6 +147,7 @@ void *channel_generate(){
 
         channel++;
         memset(&frame_head, '0', sizeof(frame_head));
+        printf("一组数据生成完毕!\n");
     }
     return NULL;
 }
