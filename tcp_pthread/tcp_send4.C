@@ -10,12 +10,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define CHANNEL_NUM (8)
+#define CHANNEL_NUM (1)
 #define MMAP_SIZE (8 * 1024)
-#define CPU_CORE (4) //CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
+#define CPU_CORE (2) //CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
 #define PACK_SIZE (2 * 1024)
 #define CLIENT_NUM (1)
-#define CHANNEL_NUM (8)
 
 typedef struct board_head
 {
@@ -41,7 +40,6 @@ FRAME_HEAD frame_head;
 int channel_id;
 int *signal; //4:stop    0:write     1:wait for read
 char *data;
-char buf[32];
 int data_fd, signal_fd;
 int socket_fd;
 int port = 10000;
@@ -143,6 +141,7 @@ void *data_send()
     char buf[8] = {'\0'};
     int ret;
     int part;
+    count = 0;
 
     while (global_alarm == 0)
     {
@@ -156,7 +155,9 @@ void *data_send()
                 printf("第%d次发送 , 线程id: %d : Send failed!\n", count, id);
                 exit(1);
             }
+            printf("第%d次发送 , 线程id: %d : Send success!\n", count, id);
             memset(&pack_send[part], '0', PACK_SIZE);
+            count++;
         }
         send_alarm = 0;
     }
@@ -167,6 +168,7 @@ void *data_send()
 void socket_ptd_create()
 {
     int ret;
+    int on = 1;
     socklen_t len;
 
     struct sockaddr_in localaddr = {0};
@@ -180,6 +182,7 @@ void socket_ptd_create()
         printf("Socket fail!\n");
         exit(1);
     }
+    setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
     ret = bind(socket_fd, (struct sockaddr *)&localaddr, sizeof(localaddr));
     if (ret < 0)
     {
@@ -228,16 +231,18 @@ void *data_part()
     int frame_length;
     char zero_buf[32];
     int part;
+    char buf[32];
 
     memset(&pack_send, '0', sizeof(pack_send));
     memset(zero_buf, '0', 32);
+    memset(buf, '\0', 32);
 
     while (*signal == 0 || send_alarm == 1)
         ;
 
     for (int i = 0; i < CLIENT_NUM; i++)
     {
-        memcpy(pack_send[i] + 32, data, 32);
+        memcpy(pack_send[i], data, 32);
         pack_length[i] = 32;
     }
     cpy_length = 32;
@@ -262,10 +267,13 @@ void *data_part()
                 memcpy(buf, data + cpy_length + 16, 16);
                 ret = atoi(buf);
                 part = ret % CLIENT_NUM;
+                memset(buf, '\0', 32);
 
                 memcpy(pack_send[part] + pack_length[part], data + cpy_length, 32 * 3 + ret);
                 pack_length[part] += ret + 32 * 3;
-                cpy_length = +32 * 3 + ret;
+                cpy_length += 32 * 3 + ret;
+            }else{
+                printf("Data read error! Channel:%d\n", ret);
             }
             //这里需要做数据不连续的处理
             //应该增加一种条件，即pData没有存储满时读取已存储部分

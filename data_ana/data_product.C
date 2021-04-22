@@ -9,8 +9,8 @@
 #include <unistd.h>
 
 #define PI (3.1415956)
-#define CHANNEL_NUM (8)
-#define MMAP_SIZE (8192)
+#define CHANNEL_NUM (1)
+#define MMAP_SIZE (8 * 1024)
 #define SUBDATA_SIZE (1024)
 
 typedef struct board_head
@@ -52,13 +52,13 @@ double sinfunc(double x, int a){
 void mmap_open(){
     data_fd = shm_open("shm01", O_CREAT | O_RDWR, 0777);
     if(data_fd < 0){
-        printf("Share memery open failed!");
+        printf("Share memery open failed!\n");
         exit(1);
     }
     ftruncate(data_fd, MMAP_SIZE);
     data = (char *)mmap(NULL, MMAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, data_fd, 0);
     if(!data){
-        printf("Mmap failed!");
+        printf("Mmap failed!\n");
         close(data_fd);
         exit(1);
     }
@@ -69,13 +69,13 @@ void signal_mmap_open(){
     signal_fd = shm_open("shm02", O_CREAT | O_RDWR, 0777);
     if (signal_fd < 0)
     {
-        printf("Share memery open failed!");
+        printf("Share memery open failed!\n");
         exit(1);
     }
     ftruncate(signal_fd, 4);
     signal = (int *)mmap(NULL, 4, PROT_READ | PROT_WRITE, MAP_SHARED, signal_fd, 0);
     if(!signal){
-        printf("Signal mmap failed!");
+        printf("Signal mmap failed!\n");
         exit(1);
     }
     *signal = 0;
@@ -117,9 +117,14 @@ void *channel_generate(){
     memset(&frame_head, '0', sizeof(frame_head));
 
     memcpy(board_head.board_addr, "99999999", 8);
+    memset(board_head.board_type, '1', 8);
+    memset(board_head.Error, '2', 14);
+    memset(board_head.Ftype, '8', 2);
+    memcpy(data, &board_head, 32);
     channel = 0;
     data_length = 32;
     time0 = 0;
+    char exp[MMAP_SIZE];
 
     while(*signal != 4){
         if (channel == CHANNEL_NUM){
@@ -136,18 +141,19 @@ void *channel_generate(){
         subdata_generate(channel);
         if((MMAP_SIZE - data_length) <= (sub_length + 3 * 32)){
             *signal = 1;
+            memcpy(exp, data, MMAP_SIZE);
+            printf("%s\n", exp);
             while(*signal == 1);
             memset(subdata, '0', SUBDATA_SIZE);
             data_length = 0;
         }
 
         memcpy(data + data_length, &frame_head, 32 * 3);
-        memcpy(data + data_length, subdata, sub_length);
+        memcpy(data + data_length + 32 * 3, subdata, sub_length);
         data_length += sub_length + 32 * 3;
 
         channel++;
         memset(&frame_head, '0', sizeof(frame_head));
-        printf("一组数据生成完毕!\n");
     }
     return NULL;
 }

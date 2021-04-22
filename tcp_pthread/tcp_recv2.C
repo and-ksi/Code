@@ -27,7 +27,7 @@ typedef struct frame_head
     char timestamp[64];
 } FRAME_HEAD;
 
-char IP[] = "192.168.3.1";
+char IP[] = "192.168.3.2";
 char pack_recved[PACK_SIZE];
 int port = 10000;
 int recv_alarm, ana_alarm, ptd_alarm, global_alarm;
@@ -45,6 +45,7 @@ void *pack_recv()
     ptd_alarm = 1;
 
     int ret;
+    int on = 1;
     recv_count = 0;
 
     struct sockaddr_in serveraddr = {0};
@@ -58,6 +59,7 @@ void *pack_recv()
         printf("Socket fail!\n");
         exit(1);
     }
+    setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
     connect_fd = connect(socket_fd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
     if (connect_fd < 0)
     {
