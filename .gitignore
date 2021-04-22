@@ -7,3 +7,6 @@ speed_test/tcp_speeds.log
 test/test
 data_ana/data_product
 data_ana/data_product
+speed_test/tcp_speeds.log
+tcp_pthread/send
+tcp_pthread/recv

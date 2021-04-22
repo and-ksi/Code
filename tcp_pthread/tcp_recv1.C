@@ -27,7 +27,7 @@ typedef struct frame_head
     char timestamp[64];
 } FRAME_HEAD;
 
-char IP[32] = "192.168.3.1";
+char IP[] = "192.168.3.1";
 char pack_recved[PACK_SIZE];
 int port = 10000;
 int recv_alarm, ana_alarm, ptd_alarm, global_alarm;
@@ -48,7 +48,7 @@ void *pack_recv()
 
     struct sockaddr_in serveraddr = {0};
     serveraddr.sin_family = AF_INET;
-    serveraddr.sin_port = port;
+    serveraddr.sin_port = htons(port);
     inet_pton(AF_INET, IP, &serveraddr.sin_addr.s_addr);
 
     socket_fd = socket(AF_INET, SOCK_STREAM, 0);

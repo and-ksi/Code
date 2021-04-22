@@ -57,14 +57,14 @@ void mmap_open(){
     data_fd = shm_open("shm01", O_CREAT | O_RDWR, 0777);
     if (data_fd < 0)
     {
-        printf("Share memery open failed!");
+        printf("Share memery open failed!\n");
         exit(1);
     }
     ftruncate(data_fd, MMAP_SIZE);
     data = (char *)mmap(NULL, MMAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, data_fd, 0);
     if (!data)
     {
-        printf("Mmap failed!");
+        printf("Mmap failed!\n");
         close(data_fd);
         exit(1);
     }
@@ -75,14 +75,14 @@ void signal_mmap_open()
     signal_fd = shm_open("shm02", O_CREAT | O_RDWR, 0777);
     if (signal_fd < 0)
     {
-        printf("Share memery open failed!");
+        printf("Share memery open failed!\n");
         exit(1);
     }
     ftruncate(signal_fd, 4);
     signal = (int *)mmap(NULL, 4, PROT_READ | PROT_WRITE, MAP_SHARED, signal_fd, 0);
     if (!signal)
     {
-        printf("Signal mmap failed!");
+        printf("Signal mmap failed!\n");
         exit(1);
     }
 }
@@ -97,7 +97,7 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
     ret = pthread_attr_init(&attr); //初始化线程属性变量,成功返回0,失败-1
     if (ret < 0)
     {
-        perror("Init attr fail");
+        perror("Init attr fail\n");
         exit(1);
     }
 
@@ -109,7 +109,7 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
         ret = pthread_attr_setaffinity_np(&attr, sizeof(cpusetinfo), &cpusetinfo);
         if (ret < 0)
         {
-            perror("Core set fail");
+            perror("Core set fail\n");
             exit(1);
         }
     }
@@ -122,7 +122,7 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
     ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); //线程分离属性:PTHREAD_CREATE_JOINABLE（非分离）
     if (ret < 0)
     {
-        perror("Detached fail");
+        perror("Detached fail!\n");
         exit(1);
     }
 
@@ -134,7 +134,7 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
 
 void *data_send(){
     int id = ptd_id;
-    printf("Id为%d的发送线程已创建完毕。", id);
+    printf("Id为%d的发送线程已创建完毕。\n", id);
     ptd_alarm = 0;
 
     char buf[8] = {'\0'};
@@ -149,7 +149,7 @@ void *data_send(){
             ret = send(acfd[part], pack_send[part], PACK_SIZE, 0);
             if (ret < 0)
             {
-                printf("第%d次发送 , 线程id: %d : Send failed!", count, id);
+                printf("第%d次发送 , 线程id: %d : Send failed!\n", count, id);
                 exit(1);
             }
             memset(&pack_send[part], '0', PACK_SIZE);
@@ -191,7 +191,7 @@ void socket_ptd_create()
 
     for (int i = 0; i < CPU_CORE - 1; i++)
     {
-        printf("创建第%d个线程...", i);
+        printf("创建第%d个线程...\n", i);
         ptd_alarm = 1;
         ptd_id = i;
         ptd_create(&ptd[i], ptd_id, (void *(*))data_send);
@@ -200,21 +200,21 @@ void socket_ptd_create()
 
     for (int i = 0; i < CLIENT_NUM; i++)
     {
-        printf("等待客户端连接...");
+        printf("等待客户端连接...\n");
         acfd[i] = accept(socket_fd, (struct sockaddr *)&clientaddr[i], &len);
         if (acfd[i] < 0)
         {
-            perror("Accept fail");
+            perror("Accept fail\n");
             exit(1);
         }
-        printf("第%d个客户端已连接!", i); //希望能够显示连接的客户端地址
+        printf("第%d个客户端已连接!\n", i); //希望能够显示连接的客户端地址
     }
 }
 
 //数据分发
 void *data_part()
 {
-    printf("Part 线程已创建!");
+    printf("Part 线程已创建!\n");
     ptd_alarm = 0;
 
     char channle_id[9] = {'\0'};
