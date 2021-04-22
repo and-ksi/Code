@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define PI (acos(-1))
+#define PI (3.1415956)
 #define CHANNEL_NUM (8)
 #define MMAP_SIZE (8192)
 #define SUBDATA_SIZE (1024)
@@ -34,7 +34,7 @@ typedef struct frame_head
 
 BOARD_HEAD board_head;
 FRAME_HEAD frame_head;
-int channel_id;
+int channel;
 int *signal;//4:stop    0:write     1:wait for read
 char *data;
 int data_length, sub_length;
@@ -44,7 +44,8 @@ char buf[32];
 int data_fd, signal_fd;
 
 double sinfunc(double x, int a){
-    double f = 5*sin(PI*2e6*x + a);
+    double f;
+    f = 5 * sin(PI * 2e6 * x + (double)a);
     return f;
 }
 
@@ -84,10 +85,14 @@ void subdata_generate(int id){
     double time, ret;
 
     memset(subdata, '0', SUBDATA_SIZE);
-    time = (double)time0 * 1e-6;
+    time = (double)time0 * 0.0000001;
 
+    while((ret = sinfunc(time, id)) < 1){
+        time0++;
+        time = (double)time0 * 0.0000001;
+    }
     sprintf(buf, "%ld", time0);
-    memcpy(frame_head.timestamp, buf, strlen(buf));
+    memcpy(frame_head.timestamp, buf, strlen(buf) + 1);
     memset(buf, '0', 32);
     while((ret = sinfunc(time, id)) >= 1){
         sprintf(buf, "%12.11f", ret);
@@ -95,8 +100,9 @@ void subdata_generate(int id){
         memset(buf, '0', 32);
         sub_length += 16;
         time0++;
+        time = (double)time0 * 0.0000001;
     }
-    if(time0 % 2 == 1){
+    if(sub_length % 32 != 0){
         sub_length += 16;
     }
     sprintf(buf, "%016d", sub_length);
@@ -111,23 +117,24 @@ void *channel_generate(){
     memset(&frame_head, '0', sizeof(frame_head));
 
     memcpy(board_head.board_addr, "99999999", 8);
-    channel_id = 0;
+    channel = 0;
     data_length = 32;
     time0 = 0;
 
     while(*signal != 4){
-        if (channel_id = CHANNEL_NUM)
-            channel_id = 0;
+        if (channel == CHANNEL_NUM){
+            channel = 0;
+            }
         memset(buf, '0', 32);
         memset(frame_head.error, '1', 6);
         memset(frame_head.Ftype, '2', 2);
-        sprintf(buf, "%08d", channel_id);
+        sprintf(buf, "%08d", channel);
         memcpy(frame_head.channle_id, buf, 8);
         memset(buf, '0', 32);
         sub_length = 0;
 
-        subdata_generate(channel_id);
-        if((MMAP_SIZE - data_length) <= sub_length){
+        subdata_generate(channel);
+        if((MMAP_SIZE - data_length) <= (sub_length + 3 * 32)){
             *signal = 1;
             while(*signal == 1);
             memset(subdata, '0', SUBDATA_SIZE);
@@ -138,7 +145,7 @@ void *channel_generate(){
         memcpy(data + data_length, subdata, sub_length);
         data_length += sub_length + 32 * 3;
 
-        channel_id++;
+        channel++;
         memset(&frame_head, '0', sizeof(frame_head));
     }
     return NULL;
