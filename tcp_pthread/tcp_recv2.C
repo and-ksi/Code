@@ -89,8 +89,6 @@ void *data_analys()
     printf("Ana 线程已创建!\n");
     ptd_alarm = 1;
 
-    BOARD_HEAD board_head;
-    FRAME_HEAD frame_head;
     long int length;
     long int ret;
     char zero_buf[32];
@@ -116,21 +114,22 @@ void *data_analys()
     memset(buf, '\0', sizeof(buf));
     length = 32;
 
+    memcpy(channel_id, pack_recved + length, 8);
+    channel[1] = atoi(channel_id);
+
     while (global_alarm == 0)
     {
         while (recv_alarm == 0)
             ;
         while (length < PACK_SIZE)
         {
-            memcpy(channel_id, pack_recved + length, 8);
-            channel[mark] = atoi(channel_id);
-            if (channel[mark] == 0)
+            if (!memcmp(zero_buf, pack_recved + length, 32))
             {
-                if (!memcmp(zero_buf, pack_recved + length, 32))
-                {
-                    break;
-                }
+                break;
             }
+            memcpy(channel_id, pack_recved + length, 8);
+            channel[0] = atoi(channel_id);
+
             if(channel[0] == channel[1]){
                 mark = 1;
             }

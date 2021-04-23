@@ -148,7 +148,7 @@ void *data_send()
     {
         while (send_alarm == 0)
             ;
-        for (int i = 0; (part = id + CPU_CORE * i) < CLIENT_NUM; i++)
+        for (int i = 0; (part = id + (CPU_CORE - 1) * i) < CLIENT_NUM; i++)
         {
             ret = send(acfd[part], pack_send[part], PACK_SIZE, 0);
             if (ret < 0)
@@ -256,16 +256,14 @@ void *data_part()
         memcpy(expasdf, data, MMAP_SIZE);
         while (cpy_length < MMAP_SIZE)
         {
+            if (!memcmp(zero_buf, data + cpy_length, 32))
+            {
+                break;
+            }
             memcpy(channel_id, data + cpy_length, 8);
             ret = atoi(channel_id);
-            if (ret == 0)
-            {
-                if (memcmp(zero_buf, data + cpy_length, 32) == 0)
-                {
-                    break;
-                }
-            }
-            if (ret < CHANNEL_NUM)
+
+            if (ret < CHANNEL_NUM && ret >= 0)
             {
                 part = ret % CLIENT_NUM;
                 memcpy(buf, data + cpy_length + 16, 16);

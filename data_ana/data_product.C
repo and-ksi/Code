@@ -91,7 +91,7 @@ void subdata_generate(int id){
         time0++;
         time = (double)time0 * 0.0000001;
     }
-    sprintf(buf, "%ld", time0);
+    sprintf(buf, "%09d", time0);//64位的时间戳这里仅使用十位
     memcpy(frame_head.timestamp, buf, strlen(buf) + 1);
     memset(buf, '\0', 32);
     while((ret = sinfunc(time, id)) >= 1){
