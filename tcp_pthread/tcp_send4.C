@@ -10,11 +10,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define CHANNEL_NUM (1)
+#define CHANNEL_NUM (8)
 #define MMAP_SIZE (8 * 1024)
-#define CPU_CORE (2) //CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
-#define PACK_SIZE (2 * 1024)
-#define CLIENT_NUM (1)
+#define CPU_CORE (4) //CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
+#define PACK_SIZE (4 * 1024)
+#define CLIENT_NUM (7)
 
 typedef struct board_head
 {
@@ -50,6 +50,7 @@ int ptd_id, count;
 int pack_length[CLIENT_NUM] = {0};
 struct sockaddr_in clientaddr[10] = {0};
 pthread_t ptd[10];
+char expasdf[PACK_SIZE]; //debug
 
 void mmap_open()
 {
@@ -169,6 +170,7 @@ void socket_ptd_create()
 {
     int ret;
     int on = 1;
+    int i;
     socklen_t len;
 
     struct sockaddr_in localaddr = {0};
@@ -196,7 +198,7 @@ void socket_ptd_create()
         exit(1);
     }
 
-    for (int i = 0; i < CPU_CORE - 1; i++)
+    for (i = 0; i < CPU_CORE - 1; i++)
     {
         printf("创建第%d个线程...\n", i);
         ptd_alarm = 1;
@@ -206,7 +208,7 @@ void socket_ptd_create()
             ;
     }
 
-    for (int i = 0; i < CLIENT_NUM; i++)
+    for (i = 0; i < CLIENT_NUM; i++)
     {
         printf("等待客户端连接...\n");
         acfd[i] = accept(socket_fd, (struct sockaddr *)&clientaddr[i], &len);
@@ -251,13 +253,14 @@ void *data_part()
     {
         while (*signal == 0 || send_alarm == 1)
             ;
+        memcpy(expasdf, data, MMAP_SIZE);
         while (cpy_length < MMAP_SIZE)
         {
             memcpy(channel_id, data + cpy_length, 8);
             ret = atoi(channel_id);
             if (ret == 0)
             {
-                if (!memcmp(zero_buf, data + cpy_length, 32))
+                if (memcmp(zero_buf, data + cpy_length, 32) == 0)
                 {
                     break;
                 }
@@ -282,6 +285,9 @@ void *data_part()
         memset(data, '0', MMAP_SIZE);
         *signal = 0;
         send_alarm = 1;
+        for(int i = 0; i < CLIENT_NUM; i++){
+            pack_length[i] = 0;
+        }
         cpy_length = 0;
     }
     return NULL;

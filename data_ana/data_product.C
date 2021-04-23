@@ -9,7 +9,7 @@
 #include <unistd.h>
 
 #define PI (3.1415956)
-#define CHANNEL_NUM (1)
+#define CHANNEL_NUM (8)
 #define MMAP_SIZE (8 * 1024)
 #define SUBDATA_SIZE (1024)
 

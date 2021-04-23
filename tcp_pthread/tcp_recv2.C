@@ -7,7 +7,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define PACK_SIZE (2 * 1024)
+#define PACK_SIZE (4 * 1024)
 
 typedef struct board_head
 {
@@ -27,7 +27,7 @@ typedef struct frame_head
     char timestamp[64];
 } FRAME_HEAD;
 
-char IP[] = "192.168.3.2";
+char IP[] = "192.168.3.1";
 char pack_recved[PACK_SIZE];
 int port = 10000;
 int recv_alarm, ana_alarm, ptd_alarm, global_alarm;
@@ -143,10 +143,13 @@ void *data_analys()
                 length += ret + 3 * 32;
                 printf("ADC INFO:\nchannel_id: %s\nError: %s\nFtype: %s\nLength: %ld\n",
                        channel_id, buf[0], buf[1], ret);
+                printf("debug info: length: %ld, channel: %d\n", length, channel[mark]);
+                memset(buf, '\0', sizeof(buf));
             }
             mark = 0;
         }
         length = 0;
+        memset(pack_recved, '0', PACK_SIZE);
         recv_alarm = 0;
     }
     return NULL;
