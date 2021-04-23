@@ -234,7 +234,7 @@ void *data_part()
     char buf[32];
 
     memset(&pack_send, '0', sizeof(pack_send));
-    memset(zero_buf, '0', 32);
+    memset(zero_buf, '0', 32);//加上尺寸条件
     memset(buf, '\0', 32);
 
     while (*signal == 0 || send_alarm == 1)
@@ -245,7 +245,7 @@ void *data_part()
         memcpy(pack_send[i], data, 32);
         pack_length[i] = 32;
     }
-    cpy_length = 32;
+    cpy_length = 32;//将board——head
 
     while (global_alarm == 0)
     {
@@ -264,9 +264,9 @@ void *data_part()
             }
             if (ret < CHANNEL_NUM)
             {
+                part = ret % CLIENT_NUM;
                 memcpy(buf, data + cpy_length + 16, 16);
                 ret = atoi(buf);
-                part = ret % CLIENT_NUM;
                 memset(buf, '\0', 32);
 
                 memcpy(pack_send[part] + pack_length[part], data + cpy_length, 32 * 3 + ret);
@@ -274,9 +274,10 @@ void *data_part()
                 cpy_length += 32 * 3 + ret;
             }else{
                 printf("Data read error! Channel:%d\n", ret);
+                exit(1);
             }
             //这里需要做数据不连续的处理
-            //应该增加一种条件，即pData没有存储满时读取已存储部分
+            //应该增加一种条件，即pData没有存储满时读取已存储部分;已解决
         }
         memset(data, '0', MMAP_SIZE);
         *signal = 0;

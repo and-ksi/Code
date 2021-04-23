@@ -68,9 +68,6 @@ void *pack_recv()
         exit(1);
     }
     memset(&pack_recved, '0', PACK_SIZE);
-    recv_alarm = 0;
-    ana_alarm = 0;
-    global_alarm = 0;
 
     while (global_alarm == 0)
     {
@@ -94,8 +91,8 @@ void *data_analys()
 
     BOARD_HEAD board_head;
     FRAME_HEAD frame_head;
-    int length;
-    int ret;
+    long int length;
+    long int ret;
     char zero_buf[32];
     char buf[5][32];
     char channel_id[9];
@@ -106,7 +103,7 @@ void *data_analys()
     memset(channel_id, '\0', 9);
     memset(buf, '\0', sizeof(buf));
     memset(zero_buf, '0', 32);
-    channel[0] = channel[1] = -1;
+    channel[0] = channel[1] = -1;//不相同，自用，相同，转存另一个
     while (recv_alarm == 0)
         ;
 
@@ -144,8 +141,8 @@ void *data_analys()
                 memcpy(data_length, pack_recved + length + 16, 16);
                 ret = atoi(data_length);
                 length += ret + 3 * 32;
-                printf("ADC INFO:\nchannel_id: %s\nError: %s\nFtype: %s\nLength: %s\n",
-                       channel_id, buf[0], buf[1], data_length);
+                printf("ADC INFO:\nchannel_id: %s\nError: %s\nFtype: %s\nLength: %ld\n",
+                       channel_id, buf[0], buf[1], ret);
             }
             mark = 0;
         }
@@ -204,6 +201,10 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
 int main()
 {
     char sig;
+
+    recv_alarm = 0;
+    ana_alarm = 0;
+    global_alarm = 0;
 
     pthread_t recv_ptd, ana_ptd;
     ptd_alarm = 0;

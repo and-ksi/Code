@@ -93,11 +93,11 @@ void subdata_generate(int id){
     }
     sprintf(buf, "%ld", time0);
     memcpy(frame_head.timestamp, buf, strlen(buf) + 1);
-    memset(buf, '0', 32);
+    memset(buf, '\0', 32);
     while((ret = sinfunc(time, id)) >= 1){
         sprintf(buf, "%12.11f", ret);
         memcpy(subdata + sub_length + 4, buf, 12);
-        memset(buf, '0', 32);
+        memset(buf, '\0', 32);
         sub_length += 16;
         time0++;
         time = (double)time0 * 0.0000001;
@@ -107,8 +107,7 @@ void subdata_generate(int id){
     }
     sprintf(buf, "%016d", sub_length);
     memcpy(frame_head.length, buf, 16);
-    memset(buf, '0', 32);
-    sub_length += 32 * 3;
+    memset(buf, '\0', 32);
 }
 
 void *channel_generate(){
@@ -130,26 +129,26 @@ void *channel_generate(){
         if (channel == CHANNEL_NUM){
             channel = 0;
             }
-        memset(buf, '0', 32);
+        memset(buf, '\0', 32);
         memset(frame_head.error, '1', 6);
         memset(frame_head.Ftype, '2', 2);
         sprintf(buf, "%08d", channel);
         memcpy(frame_head.channle_id, buf, 8);
-        memset(buf, '0', 32);
+        memset(buf, '\0', 32);
         sub_length = 0;
 
         subdata_generate(channel);
-        if((MMAP_SIZE - data_length) <= (sub_length + 3 * 32)){
+        if((MMAP_SIZE - data_length) < (sub_length + 3 * 32)){
             *signal = 1;
-            memcpy(exp, data, MMAP_SIZE);
-            printf("%s\n", exp);
+            memcpy(exp, data, MMAP_SIZE);//debug
+            printf("本次发送数据长度：%d.\n", data_length);
             while(*signal == 1);
-            memset(subdata, '0', SUBDATA_SIZE);
             data_length = 0;
         }
 
         memcpy(data + data_length, &frame_head, 32 * 3);
         memcpy(data + data_length + 32 * 3, subdata, sub_length);
+        memset(subdata, '0', SUBDATA_SIZE);
         data_length += sub_length + 32 * 3;
 
         channel++;
