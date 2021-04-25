@@ -39,7 +39,7 @@ int *signal;//4:stop    0:write     1:wait for read
 char *data;
 int data_length, sub_length;
 char subdata[SUBDATA_SIZE];
-long int time0, starttime, time1;
+int time0, starttime, time1;
 char buf[32];
 int data_fd, signal_fd;
 

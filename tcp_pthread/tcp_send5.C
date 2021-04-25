@@ -115,11 +115,6 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
         }
     }
 
-    /* ret = pthread_attr_setscope(&attr, PTHREAD_SCOPE_PROCESS);//PTHREAD_SCOPE_SYSTEM绑定;PTHREAD_SCOPE_PROCESS非绑定
-	if(ret < 0) {
-		perror("Setscope fail");
-		exit(1);
-	} */
     ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); //线程分离属性:PTHREAD_CREATE_JOINABLE（非分离）
     if (ret < 0)
     {
@@ -133,36 +128,18 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
     pthread_attr_destroy(&attr); //销除线程属性
 }
 
-void *data_send()
-{
-    int id = ptd_id;
-    printf("Id为%d的发送线程已创建完毕。\n", id);
-    ptd_alarm = 0;
-
-    char buf[8] = {'\0'};
+void data_send0(char *mes, int *fd, int id){
     int ret;
-    int part;
-    count = 0;
 
-    while (global_alarm == 0)
+    ret = send(*fd, mes, PACK_SIZE, 0);
+    if (ret < 0)
     {
-        while (send_alarm == 0)
-            ;
-        for (int i = 0; (part = id + (CPU_CORE - 1) * i) < CLIENT_NUM; i++)
-        {
-            ret = send(acfd[part], pack_send[part], PACK_SIZE, 0);
-            if (ret < 0)
-            {
-                printf("第%d次发送 , 线程id: %d : Send failed!\n", count, id);
-                exit(1);
-            }
-            printf("第%d次发送 , 线程id: %d : Send success!\n", count, id);
-            memset(&pack_send[part], '0', PACK_SIZE);
-            count++;
-        }
-        send_alarm = 0;
+        printf("第%d次发送 : 对%d客户端 : Send failed!\n", count, id);
+        exit(1);
     }
-    return NULL;
+    printf("第%d次发送 : 对%d客户端 : Send success!\n", count, id);
+    memset(mes, '0', PACK_SIZE);
+    
 }
 
 //socket和线程创建函数
@@ -198,16 +175,6 @@ void socket_ptd_create()
         exit(1);
     }
 
-    for (i = 0; i < CPU_CORE - 1; i++)
-    {
-        printf("创建第%d个线程...\n", i);
-        ptd_alarm = 1;
-        ptd_id = i;
-        ptd_create(&ptd[i], ptd_id, (void *(*))data_send);
-        while (ptd_alarm == 1)
-            ;
-    }
-
     for (i = 0; i < CLIENT_NUM; i++)
     {
         printf("等待客户端连接...\n");
@@ -232,14 +199,15 @@ void *data_part()
     int ret;
     int frame_length;
     char zero_buf[32];
-    int part;
+    int part, i;
     char buf[32];
+    count = 0;
 
     memset(&pack_send, '0', sizeof(pack_send));
-    memset(zero_buf, '0', 32);//加上尺寸条件
+    memset(zero_buf, '0', 32); //加上尺寸条件
     memset(buf, '\0', 32);
 
-    while (*signal == 0 || send_alarm >= 1)
+    while (*signal == 0)
         ;
 
     for (int i = 0; i < CLIENT_NUM; i++)
@@ -247,13 +215,12 @@ void *data_part()
         memcpy(pack_send[i], data, 32);
         pack_length[i] = 32;
     }
-    cpy_length = 32;//将board——head
+    cpy_length = 32; //将board——head
 
     while (global_alarm == 0)
     {
-        while (*signal == 0 || send_alarm >= 1)
+        while (*signal == 0)
             ;
-        memcpy(expasdf, data, MMAP_SIZE);
         while (cpy_length < MMAP_SIZE)
         {
             if (!memcmp(zero_buf, data + cpy_length, 32))
@@ -273,7 +240,9 @@ void *data_part()
                 memcpy(pack_send[part] + pack_length[part], data + cpy_length, 32 * 3 + ret);
                 pack_length[part] += ret + 32 * 3;
                 cpy_length += 32 * 3 + ret;
-            }else{
+            }
+            else
+            {
                 printf("Data read error! Channel:%d\n", ret);
                 exit(1);
             }
@@ -282,8 +251,13 @@ void *data_part()
         }
         memset(data, '0', MMAP_SIZE);
         *signal = 0;
-        send_alarm = 1;
-        for(int i = 0; i < CLIENT_NUM; i++){
+        for (i = 0; i < CLIENT_NUM; i++)
+        {
+            data_send0(pack_send[i], &acfd[i], i);
+        }
+        count++;
+        for (int i = 0; i < CLIENT_NUM; i++)
+        {
             pack_length[i] = 0;
         }
         cpy_length = 0;
@@ -294,7 +268,7 @@ void *data_part()
 int main()
 {
     char sig;
-    pthread_t part_ptd;
+    pthread_t part_ptd, send_ptd;
 
     mmap_open();
     signal_mmap_open();
@@ -302,25 +276,6 @@ int main()
     socket_ptd_create();
     ptd_create(&part_ptd, -1, (void *(*))data_part);
 
-    while (sig != '0')
-    {
-        sig = getchar();
-        switch (sig)
-        {
-        case '1':
-            while (send_alarm >= 1)//回头再改
-                ;
-            sig = '0';
-            break;
-        }
-        global_alarm = 1;
-        close(data_fd);
-        close(signal_fd);
-        for (int i = 0; i < CLIENT_NUM; i++)
-        {
-            close(acfd[i]);
-        }
-        close(socket_fd);
-        return 0;
-    }
+    while(1);
+    return 0;
 }
