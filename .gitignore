@@ -11,3 +11,5 @@ speed_test/tcp_speeds.log
 tcp_pthread/send
 tcp_pthread/recv
 data_ana/a.out
+speed_test/tcp_speeds.log
+speed_test/udp_speeds.log
