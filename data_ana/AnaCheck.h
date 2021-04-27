@@ -74,7 +74,7 @@ AnaCheck::~AnaCheck()
 {
     if (!fChain)
         return;
-    delete fChain->GetCurrentFile();
+    delete fChain->GetCurrentFile();//返回指向当前文件的指针
 }
 
 Int_t AnaCheck::GetEntry(Long64_t entry)

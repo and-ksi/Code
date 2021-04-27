@@ -46,7 +46,7 @@ AnaTrack::AnaTrack(TTree *tree) : fChain(0)
     if (tree == 0)
     {
 
-#ifdef SINGLE_TREE
+    #ifdef SINGLE_TREE
         // The following code should be used if you want this class to access
         // a single tree instead of a chain
         TFile *f = (TFile *)gROOT->GetListOfFiles()->FindObject("Memory Directory");
@@ -56,7 +56,7 @@ AnaTrack::AnaTrack(TTree *tree) : fChain(0)
         }
         f->GetObject("track", tree);
 
-#else  // SINGLE_TREE
+    #else  // SINGLE_TREE
 
         // The following code should be used if you want this class to access a chain
         // of trees.
@@ -65,7 +65,7 @@ AnaTrack::AnaTrack(TTree *tree) : fChain(0)
         chain->Add("data_cosmic_ray_track_run0001_det1_1700V.root/track");
         chain->Add("data_cosmic_ray_track_run0002_det1_1700V.root/track");
         tree = chain;
-#endif // SINGLE_TREE
+    #endif // SINGLE_TREE
     }
     Init(tree);
 }
