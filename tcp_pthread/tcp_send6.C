@@ -86,6 +86,40 @@ void signal_mmap_open()
     }
 }
 
+int struct_head_read(void *body, int is){//is=0:输入board_head; is=1或者2:输入frame_head
+    char outbuf[4][32] = {'\0'};
+
+    if(!body || is < 0){
+        printf("Void pointer or error arg!");
+        return -1;
+    }
+    if(is == 0){
+        BOARD_HEAD *bb = (BOARD_HEAD *)body;
+        memcpy(outbuf[0], bb->board_addr, 8);
+        memcpy(outbuf[1], bb->board_type, 8);
+        memcpy(outbuf[2], bb->Error, 14);
+        memcpy(outbuf[3], bb->Ftype, 2);
+        printf("**********BOARD INFO**********\n");
+        printf("Board type:%s \nBoard addr:%s\nBoard Ftype:%s\nBoard Error:%s\n\n", outbuf[1], 
+         outbuf[0], outbuf[3], outbuf[2]);
+        return 0;
+    }else if(is == 1){
+        FRAME_HEAD * cc = (FRAME_HEAD *)body;
+        memcpy(outbuf[0], cc->channel_id, 8);
+        memcpy(outbuf[1], cc->error, 6);
+        memcpy(outbuf[2], cc->Ftype, 2);
+        memcpy(outbuf[3], cc->length, 16);
+        printf("**********FRAME INFO**********\n");
+        printf("channel_id: %s\nError: %s\nFtype: %s\nLength: %s\n\n", 
+         outbuf[0], outbuf[1], outbuf[2], outbuf[3]);
+        return atoi(outbuf[3]);
+    }else if(is == 2){
+        FRAME_HEAD *cc = (FRAME_HEAD *)body;
+        memcpy(outbuf[3], cc->length, 16);
+        return atoi(outbuf[3]);
+    }
+}
+
 //根据CPU创建和分配线程
 void ptd_create(pthread_t *arg, int k, void *functionbody)
 {
