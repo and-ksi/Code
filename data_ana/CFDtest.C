@@ -28,7 +28,7 @@ int LocMin(int n, float *T){
     return loc;
 }
 
-//恒比定时方法
+//恒比定时方法--AnaCheck.C 有问题
 void cfd(){
     float Tch[8] = {0};
     float CFDmean, CFDdata[1024];

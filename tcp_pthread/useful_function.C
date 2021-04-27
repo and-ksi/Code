@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
+
+#define CHANNEL_NUM (8)
 
 typedef struct board_head
 {
@@ -77,3 +80,53 @@ int64_t struct_head_read(void *body, char is)
         break;
     }
 }
+
+//读取数据
+//主要将全为0/1的数据转为正负5V的double
+double data_read_func(char *inp){
+    double m = 10. / 4096. ;//2^12 = 4096
+    int sum = 0;
+    for(int i = 0; i < 12; i++){
+        if(*(inp + i) == '1'){
+            sum += ldexp(1, i);
+        }
+    }
+    return (double)sum * m;
+}
+
+//输入数据指针,frame_head指针,恒比定时
+typedef struct cfd_ana{
+    int64_t timestamp_data;//frame_head.timestamp
+    int time;//触发信号起始时间,即第i次探测
+    double value;//the value of f(t)
+}CFD_ANA;
+CFD_ANA cfd_data[CHANNEL_NUM][1024];//每个通道1024个够吗
+void cfdfunc(void *data_pd, void *head_pd, int channel){
+    double p = 1.05;
+    int cfdoffset = 50;
+    int cfdthresh = -60;
+
+    FRAME_HEAD data_head;
+    memcpy(&data_head, head_pd, 32*3);
+    int data_num = struct_head_read(&data_head, 'l') / 16;
+    double data_ana[1024];//这个数组可能不太够
+    int tip = 0, k = 0;
+
+    for(int i = 0; i < data_num; i++){
+        data_ana[i] = data_read_func((data_pd + 4 + 16 * i));
+        if(i > cfdoffset){
+            data_ana[i] += -p * data_ana[i - 50];
+            if(data_ana[i] <= cfdthresh && tip == 0){
+                tip = 1;
+                cfd_data[channel][k].time = i;
+                cfd_data[channel][k].timestamp_data = struct_head_read(head_pd, 't');
+                cfd_data[channel][k].value = data_ana[i];
+                k++;
+            }else if(data_ana[i] > cfdthresh){
+                tip = 0;
+            }
+        }
+    }
+}
+
+//get the 
