@@ -2,19 +2,47 @@
 #define _RECV_ANA_H_
 
 #include <arpa/inet.h>
+#include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <getopt.h>
+#include <math.h>
+#include <memory.h>
 #include <pthread.h>
 #include <sched.h>
+#include <semaphore.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
-#include <unistd.h>
-#include <math.h>
+#include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
 
 #endif
 
+#define DEVICE_NAME_H2C_0 "/dev/xdma0_h2c_0"
+#define DEVICE_NAME_C2H_0 "/dev/xdma0_c2h_0"
+#define DEVICE_NAME_H2C_1 "/dev/xdma0_h2c_1"
+#define DEVICE_NAME_C2H_1 "/dev/xdma0_c2h_1"
+
+#define MAP_SIZE (0x7FFFFFFF) //8bit 2GB
+#define MAP_BYPASS_SIZE (4 * 1024)
+#define IMG_RAM_POS (0)
+#define RX_SIZE (10 * 1024 * 1024) //1byte 8bit
+
 #define PACK_SIZE (4 * 1024)
+#define CHANNEL_NUM (8)
+#define MMAP_SIZE (8 * 1024)
+#define CPU_CORE (4) //CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
+#define CLIENT_NUM (7)
 
 typedef struct board_head
 {
@@ -35,7 +63,7 @@ typedef struct frame_head
 } FRAME_HEAD;
 
 //根据is不同的返回值, 对head结构体进行不同的处理
-int64_t struct_head_read(void *body, char is)
+long long struct_head_read(void *body, char is)
 {
     if (!body || is == 0)
     {
@@ -43,15 +71,20 @@ int64_t struct_head_read(void *body, char is)
         return -1;
     }
     char outbuf[4][32] = {'\0'};
+    char *pt = (char *)body;
+    char timest[65] = {'\0'};
+    FRAME_HEAD cc;
+    memcpy(&cc, pt, 32 * 3);
 
     switch (is)
     {
     case 'b': //输出board info
-        BOARD_HEAD *bb = (BOARD_HEAD *)body;
-        memcpy(outbuf[0], bb->board_addr, 8);
-        memcpy(outbuf[1], bb->board_type, 8);
-        memcpy(outbuf[2], bb->Error, 14);
-        memcpy(outbuf[3], bb->Ftype, 2);
+        BOARD_HEAD bb;
+        memcpy(&bb, pt, 32);
+        memcpy(outbuf[0], &bb.board_addr, 8);
+        memcpy(outbuf[1], &bb.board_type, 8);
+        memcpy(outbuf[2], &bb.Error, 14);
+        memcpy(outbuf[3], &bb.Ftype, 2);
         printf("**********BOARD INFO**********\n");
         printf("Board type:%s \nBoard addr:%s\nBoard Ftype:%s\nBoard Error:%s\n\n", outbuf[1],
                outbuf[0], outbuf[3], outbuf[2]);
@@ -59,34 +92,36 @@ int64_t struct_head_read(void *body, char is)
         break;
 
     case 'f': //输出frame info
-        FRAME_HEAD *cc = (FRAME_HEAD *)body;
-        memcpy(outbuf[0], cc->channel_id, 8);
-        memcpy(outbuf[1], cc->error, 6);
-        memcpy(outbuf[2], cc->Ftype, 2);
-        memcpy(outbuf[3], cc->length, 16);
+        memcpy(outbuf[0], &cc.channel_id, 8);
+        memcpy(outbuf[1], &cc.error, 6);
+        memcpy(outbuf[2], &cc.Ftype, 2);
+        memcpy(outbuf[3], &cc.length, 16);
+        memcpy(timest, &cc.timestamp, 64);
         printf("**********FRAME INFO**********\n");
-        printf("channel_id: %s\nError: %s\nFtype: %s\nLength: %s\n\n",
-               outbuf[0], outbuf[1], outbuf[2], outbuf[3]);
+        printf("channel_id: %s\nError: %s\nFtype: %s\nLength: %s\nTimestamp: %lld\n\n",
+               outbuf[0], outbuf[1], outbuf[2], outbuf[3], atoi64_t(timest));
         return atoi(outbuf[3]);
         break;
 
     case 'l': //返回adc data 的length（64位整型）
-        FRAME_HEAD *cc = (FRAME_HEAD *)body;
-        memcpy(outbuf[3], cc->length, 16);
-        return atoi(outbuf[3]);
+        long ret;
+        memcpy(outbuf[3], &cc.length, 16);
+        ret = atoi64_t(outbuf[3]);
+        if(ret % 32 != 0){
+            return (ret + 16);
+        }else{
+            return ret;
+        }
         break;
 
-    case 'c': //返回adc data's channel_id(int64_)
-        FRAME_HEAD *cc = (FRAME_HEAD *)body;
-        memcpy(outbuf[0], cc->channel_id, 8);
-        return atoi(outbuf[0]);
+    case 'c': //返回adc data's channel_id(long long)
+        memcpy(outbuf[0], &cc.channel_id, 8);
+        return atoi64_t(outbuf[0]);
         break;
 
-    case 't': //back adc data's timestamp(int64_)
-        FRAME_HEAD *cc = (FRAME_HEAD *)body;
-        char timest[65] = {'\0'};
-        memcpy(timest, cc->timestamp, 64);
-        return atol(timest);
+    case 't': //back adc data's timestamp(long long)
+        memcpy(timest, &cc.timestamp, 64);
+        return atoi64_t(timest);
         break;
     }
 }
@@ -192,17 +227,17 @@ void *speed_test(void *count)
     }
 }
 
-//transform string to int64_t
-int64_t atoi64_t(char *arrTmp)
+//transform string to longlong
+long long atoi64_t(char *arrTmp)
 {
     int len = strlen(arrTmp);
-    int64_t ret = 0;
+    long long ret = 0;
     if (arrTmp == NULL)
     {
         return 0;
     }
     for(int i = len - 1; i >= 0; i--){
-        ret += (*(arrTmp + i) - 48) * (int64_t)pow(10, len - i - 1);
+        ret += (*(arrTmp + i) - 48) * (long long)pow(10, len - i - 1);
     }
     return ret;
 }

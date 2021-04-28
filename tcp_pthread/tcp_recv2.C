@@ -49,7 +49,7 @@ void *pack_recv()
     
     memset(&pack_recved, '0', PACK_SIZE);
 
-    while (global_alarm == 0)
+    while (global_alarm != -1)
     {
         while (recv_alarm == 1);
         ret = recv(socket_fd, pack_recved, PACK_SIZE, 0);
@@ -69,62 +69,37 @@ void *data_analys()
     printf("Ana 线程已创建!\n");
     ptd_alarm = 1;
 
-    long int length;
+    long length;
     long int ret;
     char zero_buf[32];
-    char buf[5][32];
-    char channel_id[9];
-    char data_length[17];
     int mark = 0;
 
-    memset(data_length, '\0', 17);
-    memset(channel_id, '\0', 9);
-    memset(buf, '\0', sizeof(buf));
     memset(zero_buf, '0', 32);
-    channel[0] = channel[1] = -1;//不相同，自用，相同，转存另一个
+    channel[0] = channel[1] = -1;//channel不相同，自用，相同，转存另一个
     while (recv_alarm == 0)
         ;
 
-    memcpy(buf[0], pack_recved, 8);
-    memcpy(buf[1], pack_recved + 8, 8);
-    memcpy(buf[2], pack_recved, 2);
-    memcpy(buf[3], pack_recved + 18, 14);
-    printf("Board INFO: \nBoard type:%s \nBoard addr:%s\nBoard Ftype:%s\nBoard Error:%s\n",
-           buf[0], buf[1], buf[2], buf[3]);
-    memset(buf, '\0', sizeof(buf));
+    struct_head_read(pack_recved, 'b');
     length = 32;
 
-    memcpy(channel_id, pack_recved + length, 8);
-    channel[1] = atoi(channel_id);
+    channel[1] = (int)struct_head_read(pack_recved + length, 'c');
 
-    while (global_alarm == 0)
+    while (global_alarm != -1)
     {
         while (recv_alarm == 0)
             ;
         while (length < PACK_SIZE)
         {
-            if (!memcmp(zero_buf, pack_recved + length, 32))
+            if (struct_head_read(pack_recved + length, 'l') == 0)//when adc length=0
             {
                 break;
             }
-            memcpy(channel_id, pack_recved + length, 8);
-            channel[0] = atoi(channel_id);
-
-            if(channel[0] == channel[1]){
-                mark = 1;
+            //ana operate
+            if(ana_alarm == 0){
+                struct_head_read(pack_recved + length, 'f');
             }
-            if (channel[mark] >= 0)
-            {
-                memcpy(buf[0], pack_recved + length + 8, 6);
-                memcpy(buf[1], pack_recved + length + 14, 2);
-                memcpy(data_length, pack_recved + length + 16, 16);
-                ret = atoi(data_length);
-                length += ret + 3 * 32;
-                printf("ADC INFO:\nchannel_id: %s\nError: %s\nFtype: %s\nLength: %ld\n",
-                       channel_id, buf[0], buf[1], ret);
-                printf("debug info: length: %ld, channel: %d\n", length, channel[mark]);
-                memset(buf, '\0', sizeof(buf));
-            }
+            
+            length += (long)struct_head_read(pack_recved + length, 'l');
             mark = 0;
         }
         length = 0;
@@ -133,8 +108,6 @@ void *data_analys()
     }
     return NULL;
 }
-
-
 
 int main()
 {
@@ -149,6 +122,7 @@ int main()
     ptd_create(&recv_ptd, 0, (void *(*))pack_recv);
     while (ptd_alarm == 0)
         ;
+    ptd_alarm = 0;
     ptd_create(&ana_ptd, 0, (void *(*))data_analys);
     while (ptd_alarm == 0)
         ;
@@ -158,16 +132,21 @@ int main()
         sig = getchar();
         switch (sig)
         {
-        case '1':
-            while (recv_alarm == 0)
-                ;
+        case '1'://关闭方式不同,1时,等待ana完成再关闭程序
             while (recv_alarm == 1)
                 ;
             sig = '0';
             break;
+        
+        case '2'://Turn off frame info display
+            ana_alarm = 1;
+            break;
+
+        default:
+            break;
         }
     }
-    global_alarm = 1;
+    global_alarm = -1;
     close(connect_fd);
     close(socket_fd);
     return 0;

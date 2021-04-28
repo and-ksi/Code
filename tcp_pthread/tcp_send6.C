@@ -1,39 +1,4 @@
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <math.h>
-#include <pthread.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/mman.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-#define CHANNEL_NUM (8)
-#define MMAP_SIZE (8 * 1024)
-#define CPU_CORE (4) //CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
-#define PACK_SIZE (4 * 1024)
-#define CLIENT_NUM (7)
-
-typedef struct board_head
-{
-    char board_type[8];
-    char board_addr[8];
-    char Ftype[2];
-    char Error[14];
-} BOARD_HEAD;
-
-typedef struct frame_head
-{
-    char channel_id[8];
-    char error[6];
-    char Ftype[2];
-    char length[16];
-    //char timestamp_H[32];
-    //char timestamp_L[32];
-    char timestamp[64];
-} FRAME_HEAD;
+#include "recv_ana.h"
 
 BOARD_HEAD board_head;
 FRAME_HEAD frame_head;
