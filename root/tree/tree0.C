@@ -1,3 +1,10 @@
+#include <iostream>
+#include <TCanvas.h>
+#include <TRandom.h>
+#include <TStyle.h>
+#include <TTree.h>
+
+#include <Riostream.h>
 /// \file
 /// \ingroup tutorial_tree
 /// \notebook -nodraw
@@ -39,12 +46,7 @@
 ///
 /// \author Heiko.Scheit@mpi-hd.mpg.de
 
-#include <TRandom.h>
-#include <TTree.h>
-#include <TCanvas.h>
-#include <TStyle.h>
-
-#include <Riostream.h>
+using namespace std;
 
 //class Det  : public TObject  {
 class Det {  // each detector gives an energy and time signal
@@ -79,7 +81,7 @@ void tree0() {
   // fill some events with random numbers
   Int_t nevent=10000;
   for (Int_t iev=0;iev<nevent;iev++) {
-    if (iev%1000==0) cout<<"Processing event "<<iev<<"..."<<endl;
+    if (iev%1000==0) std::cout<<"Processing event "<<iev<<"..."<<std::endl;
 
     Float_t ea,eb;
     gRandom->Rannor(ea,eb); // the two energies follow a gaus distribution;产生一个旋转的高斯函数的二维分布的随机数

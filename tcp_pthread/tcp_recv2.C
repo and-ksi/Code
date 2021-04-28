@@ -1,31 +1,4 @@
-#include <arpa/inet.h>
-#include <pthread.h>
-#include <sched.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
-#define PACK_SIZE (4 * 1024)
-
-typedef struct board_head
-{
-    char board_type[8];
-    char board_addr[8];
-    char Ftype[2];
-    char Error[14];
-} BOARD_HEAD;
-typedef struct frame_head
-{
-    char channel_id[8];
-    char error[6];
-    char Ftype[2];
-    char length[16];
-    //char timestamp_H[32];
-    //char timestamp_L[32];
-    char timestamp[64];
-} FRAME_HEAD;
+#include "recv_ana.h"
 
 char IP[] = "192.168.3.1";
 char pack_recved[PACK_SIZE];
@@ -39,15 +12,10 @@ int cpy_length;
 char data_pack[2][PACK_SIZE];
 int channel[2];
 
-void *pack_recv()
-{
-    printf("Socket接收线程已创建!\n");
-    ptd_alarm = 1;
-
-    int ret;
+//socket create functon, need global identifier:
+//socket_fd IP port connect_fd
+void socket_create(){
     int on = 1;
-    recv_count = 0;
-
     struct sockaddr_in serveraddr = {0};
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_port = htons(port);
@@ -67,6 +35,18 @@ void *pack_recv()
         close(socket_fd);
         exit(1);
     }
+}
+
+//receive pthread
+void *pack_recv()
+{
+    printf("Socket接收线程已创建!\n");
+    ptd_alarm = 1;
+
+    int ret;
+    recv_count = 0;
+    socket_create();
+    
     memset(&pack_recved, '0', PACK_SIZE);
 
     while (global_alarm == 0)
@@ -75,8 +55,8 @@ void *pack_recv()
         ret = recv(socket_fd, pack_recved, PACK_SIZE, 0);
         if (ret < 0)
         {
-            printf("Recv fail!\n");
-            break;
+            printf("Recv fail! recv_count: %d \n", recv_count);
+            exit(1);
         }
         recv_count++;
         recv_alarm = 1;
@@ -154,51 +134,7 @@ void *data_analys()
     return NULL;
 }
 
-//根据CPU创建和分配线程
-void ptd_create(pthread_t *arg, int k, void *functionbody)
-{
-    int ret;
 
-    pthread_attr_t attr;
-
-    ret = pthread_attr_init(&attr); //初始化线程属性变量,成功返回0,失败-1
-    if (ret < 0)
-    {
-        perror("Init attr fail");
-        exit(1);
-    }
-
-    /* if (k != -1)
-    { //k为-1时不使用核心亲和属性
-        cpu_set_t cpusetinfo;
-        CPU_ZERO(&cpusetinfo);
-        CPU_SET((CPU_CORE - 1 - k), &cpusetinfo); //将core1加入到cpu集中,同理可以将其他的cpu加入
-
-        ret = pthread_attr_setaffinity_np(&attr, sizeof(cpusetinfo), &cpusetinfo);
-        if (ret < 0)
-        {
-            perror("Core set fail");
-            exit(1);
-        }
-    } */
-
-    /* ret = pthread_attr_setscope(&attr, PTHREAD_SCOPE_PROCESS);//PTHREAD_SCOPE_SYSTEM绑定;PTHREAD_SCOPE_PROCESS非绑定
-	if(ret < 0) {
-		perror("Setscope fail");
-		exit(1);
-	} */
-    ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); //线程分离属性:PTHREAD_CREATE_JOINABLE（非分离）
-    if (ret < 0)
-    {
-        perror("Detached fail");
-        exit(1);
-    }
-
-    pthread_create(arg, &attr, (void *(*)(void *))functionbody, NULL);
-    //printf("Id为%d的线程已创建完毕。", *arg);
-
-    pthread_attr_destroy(&attr); //销除线程属性
-}
 
 int main()
 {

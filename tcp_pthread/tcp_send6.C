@@ -86,7 +86,7 @@ void signal_mmap_open()
     }
 }
 
-//根据CPU创建和分配线程
+//根据CPU创建和分配线程     感觉没什么用
 void ptd_create(pthread_t *arg, int k, void *functionbody)
 {
     int ret;
@@ -132,6 +132,7 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
     pthread_attr_destroy(&attr); //销除线程属性
 }
 
+//send function
 void data_send0(char *mes, int *fd, int id)
 {
     int ret;
@@ -147,6 +148,7 @@ void data_send0(char *mes, int *fd, int id)
     }
 }
 
+//send pthread
 void *data_send()
 {
     int id = ptd_id;

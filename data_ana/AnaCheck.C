@@ -20,7 +20,8 @@ void AnaCheck::Loop()
     if (fChain == 0)
         return;
 
-    Long64_t nentries = fChain->GetEntries();
+    Long64_t nentries = fChain->GetEntries();//not know the num of every tree,
+    //get the entries of the total chain
     gStyle->SetOptStat(0);
     gStyle->SetPadTopMargin(0.05);
     gStyle->SetPadRightMargin(0.05);

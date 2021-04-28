@@ -65,4 +65,5 @@ void macro1(){
 
 int main(){
     macro1();
+    return 0;
     }

@@ -1,9 +1,20 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <math.h>
+#ifndef _RECV_ANA_H_
+#define _RECV_ANA_H_
 
-#define CHANNEL_NUM (8)
+#include <arpa/inet.h>
+#include <pthread.h>
+#include <sched.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <math.h>
+#include <sys/time.h>
+
+#endif
+
+#define PACK_SIZE (4 * 1024)
 
 typedef struct board_head
 {
@@ -12,7 +23,6 @@ typedef struct board_head
     char Ftype[2];
     char Error[14];
 } BOARD_HEAD;
-
 typedef struct frame_head
 {
     char channel_id[8];
@@ -24,7 +34,7 @@ typedef struct frame_head
     char timestamp[64];
 } FRAME_HEAD;
 
-//根据is不同的返回值
+//根据is不同的返回值, 对head结构体进行不同的处理
 int64_t struct_head_read(void *body, char is)
 {
     if (!body || is == 0)
@@ -36,7 +46,7 @@ int64_t struct_head_read(void *body, char is)
 
     switch (is)
     {
-    case 'b'://输出board info
+    case 'b': //输出board info
         BOARD_HEAD *bb = (BOARD_HEAD *)body;
         memcpy(outbuf[0], bb->board_addr, 8);
         memcpy(outbuf[1], bb->board_type, 8);
@@ -47,8 +57,8 @@ int64_t struct_head_read(void *body, char is)
                outbuf[0], outbuf[3], outbuf[2]);
         return 0;
         break;
-    
-    case 'f'://输出frame info
+
+    case 'f': //输出frame info
         FRAME_HEAD *cc = (FRAME_HEAD *)body;
         memcpy(outbuf[0], cc->channel_id, 8);
         memcpy(outbuf[1], cc->error, 6);
@@ -60,19 +70,19 @@ int64_t struct_head_read(void *body, char is)
         return atoi(outbuf[3]);
         break;
 
-    case 'l'://返回adc data 的length（64位整型）
+    case 'l': //返回adc data 的length（64位整型）
         FRAME_HEAD *cc = (FRAME_HEAD *)body;
         memcpy(outbuf[3], cc->length, 16);
         return atoi(outbuf[3]);
         break;
 
-    case 'c'://返回adc data's channel_id(int64_)
+    case 'c': //返回adc data's channel_id(int64_)
         FRAME_HEAD *cc = (FRAME_HEAD *)body;
         memcpy(outbuf[0], cc->channel_id, 8);
         return atoi(outbuf[0]);
         break;
 
-    case 't'://back adc data's timestamp(int64_)
+    case 't': //back adc data's timestamp(int64_)
         FRAME_HEAD *cc = (FRAME_HEAD *)body;
         char timest[65] = {'\0'};
         memcpy(timest, cc->timestamp, 64);
@@ -81,9 +91,56 @@ int64_t struct_head_read(void *body, char is)
     }
 }
 
+//根据CPU创建和分配线程
+void ptd_create(pthread_t *arg, int k, void *functionbody)
+{
+    int ret;
+
+    pthread_attr_t attr;
+
+    ret = pthread_attr_init(&attr); //初始化线程属性变量,成功返回0,失败-1
+    if (ret < 0)
+    {
+        perror("Init attr fail");
+        exit(1);
+    }
+
+    /* if (k != -1)
+    { //k为-1时不使用核心亲和属性
+        cpu_set_t cpusetinfo;
+        CPU_ZERO(&cpusetinfo);
+        CPU_SET((CPU_CORE - 1 - k), &cpusetinfo); //将core1加入到cpu集中,同理可以将其他的cpu加入
+
+        ret = pthread_attr_setaffinity_np(&attr, sizeof(cpusetinfo), &cpusetinfo);
+        if (ret < 0)
+        {
+            perror("Core set fail");
+            exit(1);
+        }
+    } */
+
+    /* ret = pthread_attr_setscope(&attr, PTHREAD_SCOPE_PROCESS);//PTHREAD_SCOPE_SYSTEM绑定;PTHREAD_SCOPE_PROCESS非绑定
+	if(ret < 0) {
+		perror("Setscope fail");
+		exit(1);
+	} */
+    ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); //线程分离属性:PTHREAD_CREATE_JOINABLE（非分离）
+    if (ret < 0)
+    {
+        perror("Detached fail");
+        exit(1);
+    }
+
+    pthread_create(arg, &attr, (void *(*)(void *))functionbody, NULL);
+    //printf("Id为%d的线程已创建完毕。", *arg);
+
+    pthread_attr_destroy(&attr); //销除线程属性
+}
+
 //读取数据
 //主要将全为0/1的数据转为正负5V的double;同时也可以输出数据前4位的channel_id
-double data_read_func(char *inp, char is){
+double data_read_func(char *inp, char is)
+{
     switch (is)
     {
     case 'v':
@@ -98,7 +155,7 @@ double data_read_func(char *inp, char is){
         }
         return (double)sum * m;
         break;
-        
+
     case 'c':
         char no[5] = {'\0'};
         memcpy(no, inp, 4);
@@ -107,69 +164,45 @@ double data_read_func(char *inp, char is){
     }
 }
 
-//输入数据指针,frame_head指针,恒比定时
-typedef struct cfd_ana{
-    int64_t timestamp_data;//frame_head.timestamp
-    int time;//触发信号起始时间,即第i次探测
-    double value;//the value of f(t)
-}CFD_ANA;
-CFD_ANA cfd_data[CHANNEL_NUM][1024];//每个通道1024个
-int cfdfunc(void *head_pd){
-    double p = 1.05;
-    int cfdoffset = 50;
-    int cfdthresh = -60;
-
-    FRAME_HEAD data_head;
-    memcpy(&data_head, head_pd, 32*3);
-    int data_num = struct_head_read(&data_head, 'l') / 16;
-    double data_ana[1024];//这个数组根据需要改变大小
-    int tip = 0, k = 0, len = 32 * 3;
-    int channel = struct_head_read(&data_head, 'c');
-
-    for(int i = 0; i < data_num; i++){
-        data_ana[i] = data_read_func((char *)(head_pd + len), 'v');
-        len += 16;
-        if(i > cfdoffset){
-            data_ana[i] += -p * data_ana[i - 50];
-            if(data_ana[i] <= cfdthresh && tip == 0){
-                tip = 1;
-                cfd_data[channel][k].time = i;
-                cfd_data[channel][k].timestamp_data = struct_head_read(head_pd, 't');
-                cfd_data[channel][k].value = data_ana[i];
-                k++;
-            }else if(data_ana[i] > cfdthresh){
-                tip = 0;
-            }
-        }
-    }
-    return k;
-}
-
 //speed test pthread
-#include <sys/time.h>
-#include <stdio.h>
-void *speed_test(){
-    int cnt;//注释掉,使用global identifier代替
+void *speed_test(void *count)
+{
+    long *cnt = (long *)count; //注释掉,使用global identifier代替
     struct timeval systime;
     long time0, time1, time2 = 0, cnt1 = 0;
     double speed0, speed1;
-    int size_of_every_time = 1024;//1024kB
+    int size_of_every_time = 1024; //1024kB
     gettimeofday(&systime, 0);
     time0 = systime.tv_sec * 1e6 + systime.tv_usec;
-    while(1){
+    while (1)
+    {
         gettimeofday(&systime, 0);
         time1 = systime.tv_sec * 1e6 + systime.tv_usec - time0;
-        while(time1 - time2 > 1){//calculate every second
+        while (time1 - time2 > 1)
+        { //calculate every second
             //speed in one seconds
-            speed0 = (double)(cnt - cnt1) / (double)((time1 - time2) * 1e6 * size_of_every_time);
+            speed0 = (double)(*cnt - cnt1) / (double)((time1 - time2) * 1e6 * size_of_every_time);
             //total average speed
-            speed1 = (double)(cnt) / (double)(time1 * 1e6 * size_of_every_time);
-            printf("Average speed: %lfMB/s, second speed: %lfMB/s\n", 
-             speed0, speed1);
+            speed1 = (double)(*cnt) / (double)(time1 * 1e6 * size_of_every_time);
+            printf("Average speed: %lfMB/s, second speed: %lfMB/s\n",
+                   speed0, speed1);
             time2 = time1;
-            cnt1 = cnt;
+            cnt1 = *cnt;
         }
     }
 }
 
-//base on the cfd_data function, paint the point to the canvas
+//transform string to int64_t
+int64_t atoi64_t(char *arrTmp)
+{
+    int len = strlen(arrTmp);
+    int64_t ret = 0;
+    if (arrTmp == NULL)
+    {
+        return 0;
+    }
+    for(int i = len - 1; i >= 0; i--){
+        ret += (*(arrTmp + i) - 48) * (int64_t)pow(10, len - i - 1);
+    }
+    return ret;
+}
