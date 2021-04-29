@@ -1,5 +1,26 @@
 #include "recv_ana.h"
 
+#define MMAP_SIZE (4 * 1024)
+
+typedef struct board_head
+{
+    char board_type[8];
+    char board_addr[8];
+    char Ftype[2];
+    char Error[14];
+} BOARD_HEAD;
+
+typedef struct frame_head
+{
+    char channel_id[8];
+    char error[6];
+    char Ftype[2];
+    char length[16];
+    //char timestamp_H[32];
+    //char timestamp_L[32];
+    char timestamp[64];
+} FRAME_HEAD;
+
 BOARD_HEAD board_head;
 FRAME_HEAD frame_head;
 int channel_id;

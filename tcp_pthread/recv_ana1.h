@@ -1,5 +1,5 @@
-#ifndef _RECV_ANA_H_
-#define _RECV_ANA_H_
+#ifndef _RECV_ANA1_H_
+#define _RECV_ANA1_H_
 
 #include <arpa/inet.h>
 #include <assert.h>
@@ -45,20 +45,20 @@
 
 typedef struct board_head
 {
-    char board_type[8];
-    char board_addr[8];
-    char Ftype[2];
-    char Error[14];
+    int board_type[8];
+    int board_addr[8];
+    int Ftype[2];
+    int Error[14];
 } BOARD_HEAD;
 typedef struct frame_head
 {
-    char channel_id[8];
-    char error[6];
-    char Ftype[2];
-    char length[16];
-    //char timestamp_H[32];
-    //char timestamp_L[32];
-    char timestamp[64];
+    int channel_id[8];
+    int error[6];
+    int Ftype[2];
+    long length[16];
+    long timestamp_H[32];
+    long timestamp_L[32];
+    //int timestamp[64];
 } FRAME_HEAD;
 
 //根据is不同的返回值, 对head结构体进行不同的处理
@@ -69,46 +69,36 @@ long long struct_head_read(void *body, char is)
         printf("Void pointer or error arg!");
         return -1;
     }
-    char outbuf[4][32] = {'\0'};
-    char *pt = (char *)body;
-    char timest[65] = {'\0'};
+    int *pt = (int *)body;
     FRAME_HEAD cc;
-    memcpy(&cc, pt, 32 * 3);
+    memcpy(&cc, pt, 32 * 3 * 4);
 
     switch (is)
     {
     case 'b': //输出board info
         BOARD_HEAD bb;
-        memcpy(&bb, pt, 32);
-        memcpy(outbuf[0], &bb.board_addr, 8);
-        memcpy(outbuf[1], &bb.board_type, 8);
-        memcpy(outbuf[2], &bb.Error, 14);
-        memcpy(outbuf[3], &bb.Ftype, 2);
+        memcpy(&bb, pt, 32 * 4);
         printf("**********BOARD INFO**********\n");
-        printf("Board type:%s \nBoard addr:%s\nBoard Ftype:%s\nBoard Error:%s\n\n", outbuf[1],
-               outbuf[0], outbuf[3], outbuf[2]);
+        printf("Board type:%08d \nBoard addr:%08d\nBoard Ftype:%02d\nBoard Error:%014d\n\n", bb.board_type, bb.board_addr, bb.Ftype, bb.Error);
         return 0;
         break;
 
     case 'f': //输出frame info
-        memcpy(outbuf[0], &cc.channel_id, 8);
-        memcpy(outbuf[1], &cc.error, 6);
-        memcpy(outbuf[2], &cc.Ftype, 2);
-        memcpy(outbuf[3], &cc.length, 16);
-        memcpy(timest, &cc.timestamp, 64);
         printf("**********FRAME INFO**********\n");
-        printf("channel_id: %s\nError: %s\nFtype: %s\nLength: %s\nTimestamp: %lld\n\n",
-               outbuf[0], outbuf[1], outbuf[2], outbuf[3], atoll(timest));
-        return atoi(outbuf[3]);
+        printf("channel_id: %08d\nError: %06d\nFtype: %02d\nLength: %016d\nTimestamp_H: %016d\nTimestamp_L: %032d\n\n",
+               cc.channel_id, cc.error, cc.Ftype, cc.length, cc.timestamp_H, cc.timestamp_L);
+        return cc.length;
         break;
 
     case 'l': //返回adc data 的length（64位整型）
         long ret;
-        memcpy(outbuf[3], &cc.length, 16);
-        ret = atol(outbuf[3]);
-        if(ret % 32 != 0){
+        ret = cc.length;
+        if (ret % 32 != 0)
+        {
             return (ret + 16);
-        }else{
+        }
+        else
+        {
             return ret;
         }
         break;
@@ -139,7 +129,7 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
         exit(1);
     }
 
-     if (k != -1)
+    if (k != -1)
     { //k为-1时不使用核心亲和属性
         cpu_set_t cpusetinfo;
         CPU_ZERO(&cpusetinfo);
@@ -214,11 +204,12 @@ void *speed_test(void *count, char *order)
         time1 = systime.tv_sec * 1e6 + systime.tv_usec - time0;
         while (time1 - time2 > 1)
         {
-            if(*order != 'n'){
+            if (*order != 'n')
+            {
                 //calculate every second
                 //speed in one seconds
-                speed0 = (double)(*__cnt - cnt1) / 
-                 (double)((time1 - time2) * 1e6 * size_of_every_time);
+                speed0 = (double)(*__cnt - cnt1) /
+                         (double)((time1 - time2) * 1e6 * size_of_every_time);
                 //total average speed
                 speed1 = (double)(*__cnt) / (double)(time1 * 1e6 * size_of_every_time);
                 printf("Average speed: %lfMB/s, second speed: %lfMB/s\n",
@@ -239,7 +230,8 @@ long long atoi64_t(char *arrTmp)
     {
         return 0;
     }
-    for(int i = len - 1; i >= 0; i--){
+    for (int i = len - 1; i >= 0; i--)
+    {
         ret += (*(arrTmp + i) - 48) * (long long)pow(10, len - i - 1);
     }
     return ret;
@@ -303,4 +295,3 @@ static uint32_t read_control(void *base_addr, int offset)
     //read_result = ltohl(read_result);
     return read_result;
 }
-
