@@ -227,6 +227,23 @@ long long bit_head_read(void *in, char sig_0){
         return ret;
         break;
 
+    case 'b':
+        printf("**********BOARD INFO**********\n");
+        printf("Board type:%d \nBoard addr:%d\nBoard Ftype:%d\nBoard Error:%d\n\n",
+         getbit_fun(in_, 24, 8), getbit_fun(in_, 16, 8), 
+         getbit_fun(in_, 14, 2), getbit_fun(in_, 0, 14));
+        return 0;
+        break;
+
+    case 'f':
+        printf("**********FRAME INFO**********\n");
+        printf("channel_id: %d\nError: %d\nFtype: %d\nLength: %d\n",
+         getbit_fun(in_, 24, 8), getbit_fun(in_, 18, 6), getbit_fun(in_, 16, 2), 
+         getbit_fun(in_, 0, 16));
+        long long ret = getbit_fun(in_ + 2, 0, 32);
+        ret = getbit_fun(in_ + 1, 0, 32) | ret << 32;
+        printf("Timestamp: %lld\n\n", ret);
+
     default:
         printf("sig_0 error!\n");
         return 0;
@@ -234,24 +251,61 @@ long long bit_head_read(void *in, char sig_0){
     }
 }
 
-unsigned int bit_data_read(void *in, char sig_1)
+unsigned int bit_data_read(unsigned int *in_, char sig_1, int d)
 {
-    if (in == NULL)
+    if (in_ == NULL)
     {
         printf("Bit read error!\n");
         return 0;
     }
-    unsigned int *in_ = (unsigned int *)in;
-    switch (sig_1)
-    {
-    case 'd':
-        return getbit_fun(in_, 16, 12);
-        break;
-    
-    case 'D':
-        return getbit_fun(in_, 0, 12);
+    int ret;
+    if(d == 0){
+        switch (sig_1)
+        {
+        case 'l':
+            return getbit_fun(in_, 16, 12);
+            break;
 
-    default:
-        break;
+        case 'c':
+            return getbit_fun(in_, 28, 4);
+
+        default:
+            return 0;
+            break;
+        }
+    }else{
+        switch (sig_1)
+        {
+        case 'l':
+            return getbit_fun(in_, 0, 12);
+            break;
+
+        case 'c':
+            return getbit_fun(in_, 12, 4);
+
+        default:
+            return 0;
+            break;
+        }
+    }
+}
+
+double bit_float_read(unsigned int *in_, int d)
+{
+    if (in_ == NULL)
+    {
+        printf("Bit read error!\n");
+        return 0;
+    }
+    int ret;
+    if (d == 0)
+    {
+        ret = getbit_fun(in_, 16, 12);
+        return (-5. + (double)ret * ((double)(ldexp(1, 12) - 1) / (double)10));
+    }
+    else
+    {
+        ret = getbit_fun(in_, 0, 12);
+        return (-5. + (double)ret * ((double)(ldexp(1, 12) - 1) / (double)10));
     }
 }
