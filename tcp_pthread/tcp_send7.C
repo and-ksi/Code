@@ -1,4 +1,4 @@
-#include "recv_ana1.h"
+#include "recv_ana2.h"
 
 int work;
 
@@ -9,16 +9,18 @@ void *control_base;
 int interrupt_fd;
 int read_end_addr;
 
-int pData_0[RX_SIZE / 4];
-int pData_1[RX_SIZE / 4];
+unsigned int pData[2][RX_SIZE / 4]; //10M / 4 * 32 bit     count
+                                    //10M / 4 * 4 MB       size
 
-static sem_t int_sem_rx;
-static sem_t int_sem_rx0;
+static sem_t int_sem_rxa;//init 1
+static sem_t int_sem_rxb;//init 1
+static sem_t int_sem_rxc;//init 0
+static sem_t int_sem_rxd;//init 1
 
 int acfd[CLIENT_NUM];
 int port = 10000;
 
-int pack_send[8][RX_SIZE / CLIENT_NUM];
+unsigned int pack_send[8][RX_SIZE / CLIENT_NUM];
 
 int socket_fd;
 struct sockaddr_in clientaddr[CLIENT_NUM];
@@ -29,18 +31,18 @@ void *event_process()
     interrupt_fd = open_event("/dev/xdma0_events_0"); //打开用户中断
     while (work == 1)
     {
-        //sem_wait(&int_sem_rx);//需要在循环外设置第一次中断
+        sem_wait(&int_sem_rxa);
         //printf("Start read interrupt !\n");
         read_event(interrupt_fd);                           //获取用户中断
         read_end_addr = (int)read_control(control_base, 0x0008); //read interrupt reg
         write_control(control_base, 0x0000, 0xFFFFFFFF);    //ack interrupt
-        sem_post(&int_sem_rx);                              //release signal
         //printf("read_end_addr = %x \n",read_end_addr);
         //lseek(c2h_fd, read_end_addr, SEEK_SET);
         //read(c2h_fd, pData_0, 32*1024);
         //cnt = cnt +1;
         //printf("cnt = %d\n",cnt);
         //printf("Stop read!\n");
+        sem_post(&int_sem_rxb); //release signal
     }
     pthread_exit(0);
 }
@@ -52,13 +54,16 @@ void *rx_process()
     int cnt;
     while (work == 1)
     {
-        sem_wait(&int_sem_rx);
+        sem_wait(&int_sem_rxb);
+        //while(read all of the buf :50MB)
         printf("read_end_addr = %x \n", read_end_addr);
         lseek(c2h_fd, read_end_addr, SEEK_SET);
-        read(c2h_fd, pData_0, RX_SIZE);
+        read(c2h_fd, pData[0], RX_SIZE);
         cnt = cnt + 1;
         printf("cnt = %d\n", cnt);
-        //sem_post(&int_sem_rx);
+        sem_post(&int_sem_rxd);
+        //while break;
+        //sem_post(&int_sem_rxa);
     }
 }
 
@@ -111,8 +116,7 @@ void *data_send(int ptd_id)
 
     while (work == 1)
     {
-        sem_wait(&int_sem_rx0);
-            ;
+        sem_wait(&int_sem_rxc);
         for (int i = 0; i < CLIENT_NUM; i++)
         {
             ret = send(acfd[cci(i)], pack_send[i], RX_SIZE / CLIENT_NUM, 0);
@@ -123,9 +127,24 @@ void *data_send(int ptd_id)
             }
             count++;
         }
-        sem_post(&int_sem_rx0);
+        sem_post(&int_sem_rxd);
     }
     return NULL;
+}
+
+//data send function; how to switch client and pack_send?
+void data_send_func(int *count__){
+    int ret;
+    for (int i = 0; i < CLIENT_NUM; i++)
+    {
+        ret = send(acfd[i], pack_send[i], RX_SIZE / CLIENT_NUM, 0);
+        if (ret < 0)
+        {
+            printf("第%d次发送 : 对%d客户端 : Send failed!\n", *count__, i);
+        }
+    }
+    *count__++;
+    memset(pack_send, 0, sizeof(pack_send));
 }
 
 //socket和线程创建函数
@@ -174,3 +193,30 @@ void socket_create()
     }
 }
 
+//part operation function
+void part_operation(void *ddata, int si){
+
+}
+
+//part data to each client
+//wait33 --> post1;post2
+void *data_part(){
+    int cpy_count, past_count[CLIENT_NUM] = {0};
+    int part_count = 0, pid;
+
+    memset(&pack_send, 0, sizeof(pack_send));
+    sem_wait(&int_sem_rxd);//only for add board info to pack_send
+    for(int i = 0; i < CLIENT_NUM; i++){
+        pack_send[i][0] = pData[0][0];
+        past_count[i]++;
+    }
+    cpy_count++;
+    sem_post(&int_sem_rxd);
+    while(work == 1){
+        pid = part_count & 1;
+        sem_wait(&int_sem_rxd);
+        while(cpy_count < RX_SIZE / 4){
+
+        }
+    }
+}
