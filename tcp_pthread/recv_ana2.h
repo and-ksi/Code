@@ -309,3 +309,4 @@ double bit_float_read(unsigned int *in_, int d)
         return (-5. + (double)ret * ((double)(ldexp(1, 12) - 1) / (double)10));
     }
 }
+
