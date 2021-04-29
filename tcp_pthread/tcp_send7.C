@@ -13,17 +13,19 @@ unsigned int pData[2][RX_SIZE / 4]; //10M / 4 * 32 bit     count
                                     //10M / 4 * 4 MB       size
 
 static sem_t int_sem_rxa;//init 1
-static sem_t int_sem_rxb;//init 1
-static sem_t int_sem_rxc;//init 0
-static sem_t int_sem_rxd;//init 1
+static sem_t int_sem_rxb;//init 0
+static sem_t int_sem_rxc;//init 1
 
+//准备发往各个客户端的二维数组
+unsigned int pack_send[CHANNEL_NUM][RX_SIZE / CLIENT_NUM * 2];
+
+//socket所需变量
 int acfd[CLIENT_NUM];
 int port = 10000;
-
-unsigned int pack_send[8][RX_SIZE / CLIENT_NUM];
-
 int socket_fd;
 struct sockaddr_in clientaddr[CLIENT_NUM];
+
+int total_count;
 
 /*中断处理进程*/
 void *event_process()
@@ -38,7 +40,7 @@ void *event_process()
         write_control(control_base, 0x0000, 0xFFFFFFFF);    //ack interrupt
         //printf("read_end_addr = %x \n",read_end_addr);
         //lseek(c2h_fd, read_end_addr, SEEK_SET);
-        //read(c2h_fd, pData_0, 32*1024);
+        //read(c2h_fd, pData[0], 32*1024);
         //cnt = cnt +1;
         //printf("cnt = %d\n",cnt);
         //printf("Stop read!\n");
@@ -51,7 +53,7 @@ void *rx_process()
 {
     struct timeval sstime;
     long time0;
-    int cnt;
+
     while (work == 1)
     {
         sem_wait(&int_sem_rxb);
@@ -59,9 +61,11 @@ void *rx_process()
         printf("read_end_addr = %x \n", read_end_addr);
         lseek(c2h_fd, read_end_addr, SEEK_SET);
         read(c2h_fd, pData[0], RX_SIZE);
-        cnt = cnt + 1;
-        printf("cnt = %d\n", cnt);
-        sem_post(&int_sem_rxd);
+        printf("cnt: %d\n", total_count);
+        total_count++;
+        sem_post(&int_sem_rxc);
+        sem_post(&int_sem_rxa); //当有两个数组交替读取时,条件执行post:a
+                                //因为暂时不需要交替,无条件执行post:a
         //while break;
         //sem_post(&int_sem_rxa);
     }
@@ -96,8 +100,6 @@ void dev_open_fun()
     mmap(0, MAP_SIZE, PROT_WRITE, MAP_SHARED, h2c_fd, 0);
 
     printf("h2c device Memory map successful!\n");
-
-    work = 1;
 }
 
 //culculate the client_num base on channel
@@ -105,39 +107,12 @@ int cci(int id){
     return id;
 }
 
-//send pthread
-void *data_send(int ptd_id)
-{
-    int id = ptd_id;
-    printf("Id为%d的发送线程已创建完毕。\n", id);
-
-    int ret;
-    int count = 0;
-
-    while (work == 1)
-    {
-        sem_wait(&int_sem_rxc);
-        for (int i = 0; i < CLIENT_NUM; i++)
-        {
-            ret = send(acfd[cci(i)], pack_send[i], RX_SIZE / CLIENT_NUM, 0);
-            if (ret < 0)
-            {
-                printf("第%d次发送 : 对%d客户端 : Send failed!\n", count, i);
-                exit(1);
-            }
-            count++;
-        }
-        sem_post(&int_sem_rxd);
-    }
-    return NULL;
-}
-
 //data send function; how to switch client and pack_send?
 void data_send_func(int *count__){
     int ret;
     for (int i = 0; i < CLIENT_NUM; i++)
     {
-        ret = send(acfd[i], pack_send[i], RX_SIZE / CLIENT_NUM, 0);
+        ret = send(acfd[i], pack_send[i], RX_SIZE / CLIENT_NUM * 2, 0);
         if (ret < 0)
         {
             printf("第%d次发送 : 对%d客户端 : Send failed!\n", *count__, i);
@@ -194,29 +169,129 @@ void socket_create()
 }
 
 //part operation function
-void part_operation(void *ddata, int si){
-
+void part_operation(void *ddata, int si, int *_cpy_cnt, int *p_cnt){
+    unsigned int *d_data = (unsigned int *)ddata;
+    int _channel_, _length;
+    while (*_cpy_cnt < RX_SIZE / 4){
+        if ((_length = bit_head_read(ddata + *_cpy_cnt, 'l')) == 0)
+        {
+            break;
+        }
+        _channel_ = bit_head_read(ddata + *_cpy_cnt, 'c');
+        memcpy(pack_send[cci(_channel_)] + *p_cnt, ddata + *_cpy_cnt, 4 * _length);
+        *(p_cnt + cci(_channel_)) += _length + 1;
+        *_cpy_cnt += _length + 1;
+    }
 }
 
 //part data to each client
 //wait33 --> post1;post2
 void *data_part(){
     int cpy_count, past_count[CLIENT_NUM] = {0};
-    int part_count = 0, pid;
+    int pid;
 
     memset(&pack_send, 0, sizeof(pack_send));
-    sem_wait(&int_sem_rxd);//only for add board info to pack_send
+    sem_wait(&int_sem_rxc);//only for add board info to pack_send
     for(int i = 0; i < CLIENT_NUM; i++){
         pack_send[i][0] = pData[0][0];
         past_count[i]++;
     }
     cpy_count++;
-    sem_post(&int_sem_rxd);
+    sem_post(&int_sem_rxc);
     while(work == 1){
-        pid = part_count & 1;
-        sem_wait(&int_sem_rxd);
-        while(cpy_count < RX_SIZE / 4){
+        pid = pid & 1;
+        sem_wait(&int_sem_rxc);//等待添加pData[1]...的处理
+        part_operation(pData[0], RX_SIZE / 4, &cpy_count, past_count);
+        sem_wait(&int_sem_rxb);
+        data_send_func(&total_count);
+        cpy_count = 0;
+        memset(past_count, 0, CLIENT_NUM * 4);
+        pid++;
+    }
+}
 
+int main(){
+    sem_init(&int_sem_rxa, 0, 1);
+    sem_init(&int_sem_rxb, 0, 0);
+    sem_init(&int_sem_rxc, 0, 1);
+
+    char sig;
+    unsigned int pos = 0;
+    unsigned int cnontrol_3;
+
+    pthread_t event_thread, rx_thread;
+    pthread_t part_ptd;
+
+    dev_open_fun();
+    socket_create();
+    work = 1;
+
+    pthread_create(&event_thread, NULL, (void *(*)(void *))event_process, NULL);
+    pthread_create(&rx_thread, NULL, (void *(*)(void *))rx_process, NULL);
+    ptd_create(&part_ptd, -1, data_part);
+
+    while(sig != 'o'){
+        sig = getchar();
+        switch (sig)
+        {
+        case 'w':
+            lseek(c2h_fd, pos, SEEK_SET);
+            read(c2h_fd, pData[0], 4 * 1024);
+            printf("Read data successful!\n");
+
+            for (int i = 0; i < 1024; i++)
+            {
+                printf("The data of address %d is %x \n", i, pData[0][i]);
+            }
+            break;
+
+        case 'e':
+            total_count = 0;
+            break;
+
+        case 'r':
+            write_control(control_base, 0x0000, 0xFFFFFFFF);
+            break;
+
+        case 't':
+            write_control(control_base, 0x0004, 0xFFFFFFFF);
+            break;
+
+        case 'y':
+            cnontrol_3 = read_control(control_base, 0x0008);
+            printf("read_end_addr = %x \n", cnontrol_3);
+            break;
+
+        case 'u':
+            pos = pos + 1024;
+            printf("test_read_end_addr = %x \n", pos);
+            break;
+
+        case 'i':
+            pos = 0;
+            printf("test_read_end_addr = %x \n", pos);
+            break;
+
+        case 'g':
+            memcpy(pData[1], pData[0], sizeof(pData[1]));
+            FILE *fp;
+            fp = fopen("data.log", "w+");
+            if (fp == NULL)
+            {
+                printf("File open failed!");
+                break;
+            }
+            fwrite(pData[1], 1, sizeof(pData[1]), fp);
+            fclose(fp);
+            memset(pData[1], '0', sizeof(pData[1]));
+            break;
         }
     }
+    work = 0;
+
+    close(c2h_fd);
+    close(h2c_fd);
+    close(control_fd);
+    close(interrupt_fd);
+    return 0;
 }
