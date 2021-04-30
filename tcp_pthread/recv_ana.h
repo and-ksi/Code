@@ -218,6 +218,7 @@ long long bit_head_read(unsigned int *in_, char sig_0){
         printf("Bit read error!\n");
         return 0;
     }
+    long long ret;
     switch (sig_0)
     {
     case 'c':
@@ -229,7 +230,7 @@ long long bit_head_read(unsigned int *in_, char sig_0){
         break;
 
     case 't':
-        long long ret = getbitr_fun(in_ + 2, 0, 32);
+        ret = getbitr_fun(in_ + 2, 0, 32);
         ret = getbitr_fun(in_ + 1, 0, 32) | ret << 32;
         return ret;
         break;
@@ -247,7 +248,7 @@ long long bit_head_read(unsigned int *in_, char sig_0){
         printf("channel_id: %d\nError: %d\nFtype: %d\nLength: %d\n",
          getbitr_fun(in_, 24, 8), getbitr_fun(in_, 18, 6), getbitr_fun(in_, 16, 2), 
          getbitr_fun(in_, 0, 16));
-        long long ret = getbitr_fun(in_ + 2, 0, 32);
+        ret = getbitr_fun(in_ + 2, 0, 32);
         ret = getbitr_fun(in_ + 1, 0, 32) | ret << 32;
         printf("Timestamp: %lld\n\n", ret);
 

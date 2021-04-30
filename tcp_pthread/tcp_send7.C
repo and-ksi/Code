@@ -15,6 +15,7 @@ unsigned int pData[2][RX_SIZE / 4]; //10M / 4 * 32 bit     count
 static sem_t int_sem_rxa;//init 1
 static sem_t int_sem_rxb;//init 0
 static sem_t int_sem_rxc;//init 1
+static sem_t int_sem_rxd;//init 0
 
 //准备发往各个客户端的二维数组
 unsigned int pack_send[CHANNEL_NUM][PACK_SIZE];
@@ -109,18 +110,22 @@ int cci(int id){
 }
 
 //data send function; how to switch client and pack_send?
-void data_send_func(int *count__){
+void *data_send_func(int *count__){
     int ret;
-    for (int i = 0; i < CLIENT_NUM; i++)
-    {
-        ret = send(acfd[i], pack_send[i], past_count[i], 0);
-        if (ret < 0)
+    while(work == 1){
+        sem_wait(&int_sem_rxd);
+        for (int i = 0; i < CLIENT_NUM; i++)
         {
-            printf("第%d次发送 : 对%d客户端 : Send failed!\n", *count__, i);
+            ret = send(acfd[i], pack_send[i], past_count[i], 0);
+            if (ret < 0)
+            {
+                printf("第%d次发送 : 对%d客户端 : Send failed!\n", *count__, i);
+            }
         }
+        *count__++;
+        memset(past_count, 0, sizeof(past_count));
+        sem_post(&int_sem_rxc);
     }
-    *count__++;
-    memset(past_count, 0, sizeof(past_count));
 }
 
 //socket和线程创建函数
@@ -198,12 +203,14 @@ void *data_part(){
     }
     cpy_count++;
     sem_post(&int_sem_rxc);
+    sem_post(&int_sem_rxc);
     while(work == 1){
         pid = pid & 1;
         sem_wait(&int_sem_rxc);//等待添加pData[1]...的处理
+        sem_wait(&int_sem_rxc);
         part_operation(pData[0], RX_SIZE / 4, &cpy_count, past_count);
-        sem_wait(&int_sem_rxb);
-        data_send_func(&total_count);
+        sem_post(&int_sem_rxb);
+        sem_post(&int_sem_rxd);
         cpy_count = 0;
         pid++;
     }
@@ -213,13 +220,14 @@ int main(){
     sem_init(&int_sem_rxa, 0, 1);
     sem_init(&int_sem_rxb, 0, 0);
     sem_init(&int_sem_rxc, 0, 1);
+    sem_init(&int_sem_rxd, 0, 0);
 
     char sig;
     unsigned int pos = 0;
     unsigned int cnontrol_3;
 
     pthread_t event_thread, rx_thread;
-    pthread_t part_ptd;
+    pthread_t part_ptd, send_ptd;
 
     dev_open_fun();
     socket_create();
@@ -227,7 +235,8 @@ int main(){
 
     pthread_create(&event_thread, NULL, (void *(*)(void *))event_process, NULL);
     pthread_create(&rx_thread, NULL, (void *(*)(void *))rx_process, NULL);
-    ptd_create(&part_ptd, -1, data_part);
+    ptd_create(&part_ptd, CPU_CORE - 2, (void *)data_part);
+    ptd_create(&send_ptd, CPU_CORE - 1, (void *)data_send_func);
 
     while(sig != 'o'){
         sig = getchar();
