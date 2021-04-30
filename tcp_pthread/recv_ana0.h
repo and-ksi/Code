@@ -38,28 +38,92 @@
 #define IMG_RAM_POS (0)
 #define RX_SIZE (10 * 1024 * 1024) //1byte 8bit
 
-#define PACK_SIZE (RX_SIZE / 16)
+#define PACK_SIZE (4 * 1024)
 #define CHANNEL_NUM (8)
 #define CPU_CORE (4) //CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
 #define CLIENT_NUM (7)
 
 typedef struct board_head
 {
-    int board_type;//8
-    int board_addr;//8
-    int Ftype;//2
-    int Error;//14
+    char board_type[8];
+    char board_addr[8];
+    char Ftype[2];
+    char Error[14];
 } BOARD_HEAD;
 typedef struct frame_head
 {
-    int channel_id;//8
-    int error;//6
-    int Ftype;//2
-    int length;//16
+    char channel_id[8];
+    char error[6];
+    char Ftype[2];
+    char length[16];
     //char timestamp_H[32];
     //char timestamp_L[32];
-    long long timestamp;//64
+    char timestamp[64];
 } FRAME_HEAD;
+
+//根据is不同的返回值, 对head结构体进行不同的处理
+long long struct_head_read(void *body, char is)
+{
+    if (!body || is == 0)
+    {
+        printf("Void pointer or error arg!");
+        return -1;
+    }
+    char outbuf[4][32] = {'\0'};
+    char *pt = (char *)body;
+    char timest[65] = {'\0'};
+    FRAME_HEAD cc;
+    memcpy(&cc, pt, 32 * 3);
+
+    switch (is)
+    {
+    case 'b': //输出board info
+        BOARD_HEAD bb;
+        memcpy(&bb, pt, 32);
+        memcpy(outbuf[0], &bb.board_addr, 8);
+        memcpy(outbuf[1], &bb.board_type, 8);
+        memcpy(outbuf[2], &bb.Error, 14);
+        memcpy(outbuf[3], &bb.Ftype, 2);
+        printf("**********BOARD INFO**********\n");
+        printf("Board type:%s \nBoard addr:%s\nBoard Ftype:%s\nBoard Error:%s\n\n", outbuf[1],
+               outbuf[0], outbuf[3], outbuf[2]);
+        return 0;
+        break;
+
+    case 'f': //输出frame info
+        memcpy(outbuf[0], &cc.channel_id, 8);
+        memcpy(outbuf[1], &cc.error, 6);
+        memcpy(outbuf[2], &cc.Ftype, 2);
+        memcpy(outbuf[3], &cc.length, 16);
+        memcpy(timest, &cc.timestamp, 64);
+        printf("**********FRAME INFO**********\n");
+        printf("channel_id: %s\nError: %s\nFtype: %s\nLength: %s\nTimestamp: %lld\n\n",
+               outbuf[0], outbuf[1], outbuf[2], outbuf[3], atoll(timest));
+        return atoi(outbuf[3]);
+        break;
+
+    case 'l': //返回adc data 的length（64位整型）
+        long ret;
+        memcpy(outbuf[3], &cc.length, 16);
+        ret = atol(outbuf[3]);
+        if(ret % 32 != 0){
+            return (ret + 16);
+        }else{
+            return ret;
+        }
+        break;
+
+    case 'c': //返回adc data's channel_id(long long)
+        memcpy(outbuf[0], &cc.channel_id, 8);
+        return atoi64_t(outbuf[0]);
+        break;
+
+    case 't': //back adc data's timestamp(long long)
+        memcpy(timest, &cc.timestamp, 64);
+        return atoll(timest);
+        break;
+    }
+}
 
 //根据CPU创建和分配线程
 void ptd_create(pthread_t *arg, int k, void *functionbody)
@@ -75,7 +139,7 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
         exit(1);
     }
 
-    if (k != -1)
+     if (k != -1)
     { //k为-1时不使用核心亲和属性
         cpu_set_t cpusetinfo;
         CPU_ZERO(&cpusetinfo);
@@ -107,6 +171,33 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
     pthread_attr_destroy(&attr); //销除线程属性
 }
 
+//读取数据
+//主要将全为0/1的数据转为正负5V的double;同时也可以输出数据前4位的channel_id
+double data_read_func(char *inp, char is)
+{
+    switch (is)
+    {
+    case 'v':
+        double m = 10. / 4096.; //2^12 = 4096
+        int sum = 0;
+        for (int i = 15; i > 3; i--)
+        {
+            if (*(inp + i) == '1')
+            {
+                sum += ldexp(1, 15 - i);
+            }
+        }
+        return (double)sum * m;
+        break;
+
+    case 'c':
+        char no[5] = {'\0'};
+        memcpy(no, inp, 4);
+        return (double)atoi(no);
+        break;
+    }
+}
+
 //speed test pthread
 void *speed_test(void *count, char *order)
 {
@@ -123,12 +214,11 @@ void *speed_test(void *count, char *order)
         time1 = systime.tv_sec * 1e6 + systime.tv_usec - time0;
         while (time1 - time2 > 1)
         {
-            if (*order != 'n')
-            {
+            if(*order != 'n'){
                 //calculate every second
                 //speed in one seconds
-                speed0 = (double)(*__cnt - cnt1) /
-                         (double)((time1 - time2) * 1e6 * size_of_every_time);
+                speed0 = (double)(*__cnt - cnt1) / 
+                 (double)((time1 - time2) * 1e6 * size_of_every_time);
                 //total average speed
                 speed1 = (double)(*__cnt) / (double)(time1 * 1e6 * size_of_every_time);
                 printf("Average speed: %lfMB/s, second speed: %lfMB/s\n",
@@ -138,6 +228,21 @@ void *speed_test(void *count, char *order)
             cnt1 = *__cnt;
         }
     }
+}
+
+//transform string to longlong
+long long atoi64_t(char *arrTmp)
+{
+    int len = strlen(arrTmp);
+    long long ret = 0;
+    if (arrTmp == NULL)
+    {
+        return 0;
+    }
+    for(int i = len - 1; i >= 0; i--){
+        ret += (*(arrTmp + i) - 48) * (long long)pow(10, len - i - 1);
+    }
+    return ret;
 }
 
 /*开中断*/
@@ -197,124 +302,5 @@ static uint32_t read_control(void *base_addr, int offset)
     uint32_t read_result = *((uint32_t *)(base_addr + offset));
     //read_result = ltohl(read_result);
     return read_result;
-}
-
-unsigned int getbitr_fun(unsigned int *in, int lo, int si){
-    unsigned int ret = 0;
-    ret = (unsigned int)(ldexp(1, si) - 1) & *in >> lo;
-    return ret;
-}
-
-//useless
-unsigned int getbitl_fun(unsigned int *in, int lo, int si)
-{
-    unsigned int ret = 0;
-    //ret =  - 1) & *in << lo;
-    return ret;
-}
-
-long long bit_head_read(unsigned int *in_, char sig_0){
-    if(in_ == NULL){
-        printf("Bit read error!\n");
-        return 0;
-    }
-    switch (sig_0)
-    {
-    case 'c':
-        return getbitr_fun(in_, 24, 8);
-        break;
-
-    case 'l':
-        return getbitr_fun(in_, 0, 16);
-        break;
-
-    case 't':
-        long long ret = getbitr_fun(in_ + 2, 0, 32);
-        ret = getbitr_fun(in_ + 1, 0, 32) | ret << 32;
-        return ret;
-        break;
-
-    case 'b':
-        printf("**********BOARD INFO**********\n");
-        printf("Board type:%d \nBoard addr:%d\nBoard Ftype:%d\nBoard Error:%d\n\n",
-         getbitr_fun(in_, 24, 8), getbitr_fun(in_, 16, 8), 
-         getbitr_fun(in_, 14, 2), getbitr_fun(in_, 0, 14));
-        return 0;
-        break;
-
-    case 'f':
-        printf("**********FRAME INFO**********\n");
-        printf("channel_id: %d\nError: %d\nFtype: %d\nLength: %d\n",
-         getbitr_fun(in_, 24, 8), getbitr_fun(in_, 18, 6), getbitr_fun(in_, 16, 2), 
-         getbitr_fun(in_, 0, 16));
-        long long ret = getbitr_fun(in_ + 2, 0, 32);
-        ret = getbitr_fun(in_ + 1, 0, 32) | ret << 32;
-        printf("Timestamp: %lld\n\n", ret);
-
-    default:
-        printf("sig_0 error!\n");
-        return 0;
-        break;
-    }
-}
-
-//need adc data int
-unsigned int bit_data_read(unsigned int *in_, char sig_1, int d)
-{
-    if (in_ == NULL)
-    {
-        printf("Bit read error!\n");
-        return 0;
-    }
-    int ret;
-    if(d == 0){
-        switch (sig_1)
-        {
-        case 'l':
-            return getbitr_fun(in_, 16, 12);
-            break;
-
-        case 'c':
-            return getbitr_fun(in_, 28, 4);
-
-        default:
-            return 0;
-            break;
-        }
-    }else{
-        switch (sig_1)
-        {
-        case 'l':
-            return getbitr_fun(in_, 0, 12);
-            break;
-
-        case 'c':
-            return getbitr_fun(in_, 12, 4);
-
-        default:
-            return 0;
-            break;
-        }
-    }
-}
-
-double bit_float_read(unsigned int *in_, int d)
-{
-    if (in_ == NULL)
-    {
-        printf("Bit read error!\n");
-        return 0;
-    }
-    int ret;
-    if (d == 0)
-    {
-        ret = getbitr_fun(in_, 16, 12);
-        return (-5. + (double)ret * ((double)(ldexp(1, 12) - 1) / (double)10));
-    }
-    else
-    {
-        ret = getbitr_fun(in_, 0, 12);
-        return (-5. + (double)ret * ((double)(ldexp(1, 12) - 1) / (double)10));
-    }
 }
 

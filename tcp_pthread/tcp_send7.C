@@ -1,4 +1,4 @@
-#include "recv_ana2.h"
+#include "recv_ana.h"
 
 int work;
 
@@ -17,7 +17,7 @@ static sem_t int_sem_rxb;//init 0
 static sem_t int_sem_rxc;//init 1
 
 //准备发往各个客户端的二维数组
-unsigned int pack_send[CHANNEL_NUM][RX_SIZE / CLIENT_NUM * 2];
+unsigned int pack_send[CHANNEL_NUM][PACK_SIZE];
 
 //socket所需变量
 int acfd[CLIENT_NUM];
@@ -26,6 +26,7 @@ int socket_fd;
 struct sockaddr_in clientaddr[CLIENT_NUM];
 
 int total_count;
+int past_count[CLIENT_NUM] = {0};
 
 /*中断处理进程*/
 void *event_process()
@@ -112,14 +113,14 @@ void data_send_func(int *count__){
     int ret;
     for (int i = 0; i < CLIENT_NUM; i++)
     {
-        ret = send(acfd[i], pack_send[i], RX_SIZE / CLIENT_NUM * 2, 0);
+        ret = send(acfd[i], pack_send[i], past_count[i], 0);
         if (ret < 0)
         {
             printf("第%d次发送 : 对%d客户端 : Send failed!\n", *count__, i);
         }
     }
     *count__++;
-    memset(pack_send, 0, sizeof(pack_send));
+    memset(past_count, 0, sizeof(past_count));
 }
 
 //socket和线程创建函数
@@ -169,8 +170,7 @@ void socket_create()
 }
 
 //part operation function
-void part_operation(void *ddata, int si, int *_cpy_cnt, int *p_cnt){
-    unsigned int *d_data = (unsigned int *)ddata;
+void part_operation(unsigned int *ddata, int si, int *_cpy_cnt, int *p_cnt){
     int _channel_, _length;
     while (*_cpy_cnt < RX_SIZE / 4){
         if ((_length = bit_head_read(ddata + *_cpy_cnt, 'l')) == 0)
@@ -187,7 +187,7 @@ void part_operation(void *ddata, int si, int *_cpy_cnt, int *p_cnt){
 //part data to each client
 //wait33 --> post1;post2
 void *data_part(){
-    int cpy_count, past_count[CLIENT_NUM] = {0};
+    int cpy_count;
     int pid;
 
     memset(&pack_send, 0, sizeof(pack_send));
@@ -205,7 +205,6 @@ void *data_part(){
         sem_wait(&int_sem_rxb);
         data_send_func(&total_count);
         cpy_count = 0;
-        memset(past_count, 0, CLIENT_NUM * 4);
         pid++;
     }
 }
@@ -283,7 +282,7 @@ int main(){
             }
             fwrite(pData[1], 1, sizeof(pData[1]), fp);
             fclose(fp);
-            memset(pData[1], '0', sizeof(pData[1]));
+            memset(pData[1], 0, sizeof(pData[1]));
             break;
         }
     }

@@ -1,4 +1,4 @@
-#include "recv_ana2.h"
+#include "recv_ana.h"
 #include "data_ana.h"
 
 static sem_t int_sem_rxa; //init 1
@@ -13,6 +13,7 @@ int connect_fd;
 int read_length;
 int cpy_length;
 unsigned int data_pack[2][PACK_SIZE];
+unsigned int pack_rec[PACK_SIZE];
 int channel[2];
 
 //socket create functon, need global identifier:
@@ -50,12 +51,12 @@ void *pack_recv()
     recv_count = 0;
     socket_create();
 
-    memset(&pack_recved, '0', PACK_SIZE);
+    memset(pack_rec, 0, sizeof(pack_rec));
 
     while (global_alarm != -1)
     {
         sem_wait(&int_sem_rxa);
-        ret = recv(socket_fd, pack_recved, PACK_SIZE, 0);
+        ret = recv(socket_fd, pack_rec, PACK_SIZE, 0);
         if (ret < 0)
         {
             printf("Recv fail! recv_count: %d \n", recv_count);
