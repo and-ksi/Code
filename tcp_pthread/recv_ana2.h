@@ -199,49 +199,56 @@ static uint32_t read_control(void *base_addr, int offset)
     return read_result;
 }
 
-unsigned int getbit_fun(unsigned int *in, int lo, int si){
+unsigned int getbitr_fun(unsigned int *in, int lo, int si){
     unsigned int ret = 0;
     ret = (unsigned int)(ldexp(1, si) - 1) & *in >> lo;
     return ret;
 }
 
-long long bit_head_read(void *in, char sig_0){
-    if(in == NULL){
+//useless
+unsigned int getbitl_fun(unsigned int *in, int lo, int si)
+{
+    unsigned int ret = 0;
+    //ret =  - 1) & *in << lo;
+    return ret;
+}
+
+long long bit_head_read(unsigned int *in_, char sig_0){
+    if(in_ == NULL){
         printf("Bit read error!\n");
         return 0;
     }
-    unsigned int *in_ = (unsigned int *)in;
     switch (sig_0)
     {
     case 'c':
-        return getbit_fun(in_, 24, 8);
+        return getbitr_fun(in_, 24, 8);
         break;
 
     case 'l':
-        return getbit_fun(in_, 0, 16);
+        return getbitr_fun(in_, 0, 16);
         break;
 
     case 't':
-        long long ret = getbit_fun(in_ + 2, 0, 32);
-        ret = getbit_fun(in_ + 1, 0, 32) | ret << 32;
+        long long ret = getbitr_fun(in_ + 2, 0, 32);
+        ret = getbitr_fun(in_ + 1, 0, 32) | ret << 32;
         return ret;
         break;
 
     case 'b':
         printf("**********BOARD INFO**********\n");
         printf("Board type:%d \nBoard addr:%d\nBoard Ftype:%d\nBoard Error:%d\n\n",
-         getbit_fun(in_, 24, 8), getbit_fun(in_, 16, 8), 
-         getbit_fun(in_, 14, 2), getbit_fun(in_, 0, 14));
+         getbitr_fun(in_, 24, 8), getbitr_fun(in_, 16, 8), 
+         getbitr_fun(in_, 14, 2), getbitr_fun(in_, 0, 14));
         return 0;
         break;
 
     case 'f':
         printf("**********FRAME INFO**********\n");
         printf("channel_id: %d\nError: %d\nFtype: %d\nLength: %d\n",
-         getbit_fun(in_, 24, 8), getbit_fun(in_, 18, 6), getbit_fun(in_, 16, 2), 
-         getbit_fun(in_, 0, 16));
-        long long ret = getbit_fun(in_ + 2, 0, 32);
-        ret = getbit_fun(in_ + 1, 0, 32) | ret << 32;
+         getbitr_fun(in_, 24, 8), getbitr_fun(in_, 18, 6), getbitr_fun(in_, 16, 2), 
+         getbitr_fun(in_, 0, 16));
+        long long ret = getbitr_fun(in_ + 2, 0, 32);
+        ret = getbitr_fun(in_ + 1, 0, 32) | ret << 32;
         printf("Timestamp: %lld\n\n", ret);
 
     default:
@@ -251,6 +258,7 @@ long long bit_head_read(void *in, char sig_0){
     }
 }
 
+//need adc data int
 unsigned int bit_data_read(unsigned int *in_, char sig_1, int d)
 {
     if (in_ == NULL)
@@ -263,11 +271,11 @@ unsigned int bit_data_read(unsigned int *in_, char sig_1, int d)
         switch (sig_1)
         {
         case 'l':
-            return getbit_fun(in_, 16, 12);
+            return getbitr_fun(in_, 16, 12);
             break;
 
         case 'c':
-            return getbit_fun(in_, 28, 4);
+            return getbitr_fun(in_, 28, 4);
 
         default:
             return 0;
@@ -277,11 +285,11 @@ unsigned int bit_data_read(unsigned int *in_, char sig_1, int d)
         switch (sig_1)
         {
         case 'l':
-            return getbit_fun(in_, 0, 12);
+            return getbitr_fun(in_, 0, 12);
             break;
 
         case 'c':
-            return getbit_fun(in_, 12, 4);
+            return getbitr_fun(in_, 12, 4);
 
         default:
             return 0;
@@ -300,13 +308,70 @@ double bit_float_read(unsigned int *in_, int d)
     int ret;
     if (d == 0)
     {
-        ret = getbit_fun(in_, 16, 12);
+        ret = getbitr_fun(in_, 16, 12);
         return (-5. + (double)ret * ((double)(ldexp(1, 12) - 1) / (double)10));
     }
     else
     {
-        ret = getbit_fun(in_, 0, 12);
+        ret = getbitr_fun(in_, 0, 12);
         return (-5. + (double)ret * ((double)(ldexp(1, 12) - 1) / (double)10));
     }
 }
 
+//2500MHz时,延迟时间50次,20ns
+//20MHz,延迟时间?
+long long cfd_get_begintime(unsigned int *in_){
+    if (in_ == NULL)
+    {
+        printf("Bit read error!\n");
+        return 0;
+    }
+    int delay_time = 10;
+    int k = 1.04;
+
+    unsigned int _cfd[1024];
+    long long timestamp_ = bit_head_read(in_, 't');
+    int _length = (int)bit_head_read(in_, 'l');
+    for(int i = 0; i < (2 * _length); i++){
+        _cfd[i] = bit_data_read(in_, 'l', i & 1);
+        if(i > delay_time - 1){
+            _cfd[i] += -k * _cfd[i - delay_time];
+            if(_cfd[i] == 0){
+                return timestamp_ + i;
+            }else if(_cfd[i] * _cfd[i - 1] < 0){
+                return timestamp_ + (_cfd[i] * (i - 1) / _cfd[i - 1]);
+            }
+        }
+    }
+    return 0;
+}
+
+//calculate position ;1+   2-
+//take the center of square as zero pointer
+//20MHz
+double cal_position(unsigned int *s1, unsigned int *s2){
+    long long t1 = bit_head_read(s1, 't');
+    long long t2 = bit_head_read(s2, 't');
+
+    return ((double)(t1 - t2) * (double)(3 / 8));
+}
+
+//calculate kinetic energy
+//需要传入指向指针数组的指针
+//channel: X1, X2, Y1, Y2, X3, X4, Y3, Y4
+//延迟块间4ns, 间距3mm, 从一端到另一端完整132ns
+double cal_energy(unsigned int **_in){
+    double s[4];
+    for(int i = 0; i < 4; i++){
+        s[i] = cal_position(*(_in + 2 * i), *(_in + 2 * i + 1));
+    }
+    long long t[8];
+    for(int i = 0; i < 8; i++){
+        t[i] = bit_head_read(*(_in + i), 't');
+    }
+    double arrive_time[2];
+    arrive_time[0] = ((t[0] + t[1]) - 132 - 2 * ((t[2] - t[3]) / 2 + 66)) / 2;
+    arrive_time[1] = ((t[4] + t[5]) - 132 - 2 * ((t[6] - t[7]) / 2 + 66)) / 2;
+    double vv = .25 / (abs(arrive_time[0] - arrive_time[1]) * 1e-9);
+    return 105.7 * vv * vv;
+}
