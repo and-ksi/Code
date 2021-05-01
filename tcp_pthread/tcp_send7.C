@@ -71,6 +71,7 @@ void *rx_process()
         //while break;
         //sem_post(&int_sem_rxa);
     }
+    return NULL;
 }
 
 //open such device func:
@@ -126,6 +127,7 @@ void *data_send_func(int *count__){
         memset(past_count, 0, sizeof(past_count));
         sem_post(&int_sem_rxc);
     }
+    return NULL;
 }
 
 //socket和线程创建函数
@@ -214,6 +216,7 @@ void *data_part(){
         cpy_count = 0;
         pid++;
     }
+    return NULL;
 }
 
 int main(){
