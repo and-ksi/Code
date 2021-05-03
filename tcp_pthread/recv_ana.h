@@ -33,10 +33,10 @@
 #define DEVICE_NAME_H2C_1 "/dev/xdma0_h2c_1"
 #define DEVICE_NAME_C2H_1 "/dev/xdma0_c2h_1"
 
-#define MAP_SIZE (0x7FFFFFFF) //8bit 2GB
+#define MAP_SIZE (0x7FFFFFFF) //8bit 2GB    ;max value of int
 #define MAP_BYPASS_SIZE (4 * 1024)
 #define IMG_RAM_POS (0)
-#define RX_SIZE (10 * 1024 * 1024) //1byte 8bit
+#define RX_SIZE (50 * 1024 * 1024) //1byte 8bit
 
 #define PACK_SIZE (RX_SIZE / 16)
 #define CHANNEL_NUM (8)

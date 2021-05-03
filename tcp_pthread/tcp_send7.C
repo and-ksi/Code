@@ -2,14 +2,14 @@
 
 int work;
 
-int c2h_fd;
+int c2h_fd[2];
 int h2c_fd;
 int control_fd;
 void *control_base;
 int interrupt_fd;
 int read_end_addr;
 
-unsigned int pData[2][RX_SIZE / 4]; //10M / 4 * 32 bit     count
+unsigned int pData[2][RX_SIZE / 8]; //25M / 4 * 32 bit     count
                                     //10M / 4 * 4 MB       size
 
 static sem_t int_sem_rxa;//init 1
@@ -40,38 +40,11 @@ void *event_process()
         read_event(interrupt_fd);                           //获取用户中断
         read_end_addr = (int)read_control(control_base, 0x0008); //read interrupt reg
         write_control(control_base, 0x0000, 0xFFFFFFFF);    //ack interrupt
-        //printf("read_end_addr = %x \n",read_end_addr);
-        //lseek(c2h_fd, read_end_addr, SEEK_SET);
-        //read(c2h_fd, pData[0], 32*1024);
-        //cnt = cnt +1;
-        //printf("cnt = %d\n",cnt);
-        //printf("Stop read!\n");
+        
+
         sem_post(&int_sem_rxb); //release signal
     }
     pthread_exit(0);
-}
-
-void *rx_process()
-{
-    struct timeval sstime;
-    long time0;
-
-    while (work == 1)
-    {
-        sem_wait(&int_sem_rxb);
-        //while(read all of the buf :50MB)
-        printf("read_end_addr = %x \n", read_end_addr);
-        lseek(c2h_fd, read_end_addr, SEEK_SET);
-        read(c2h_fd, pData[0], RX_SIZE);
-        printf("cnt: %d\n", total_count);
-        total_count++;
-        sem_post(&int_sem_rxc);
-        sem_post(&int_sem_rxa); //当有两个数组交替读取时,条件执行post:a
-                                //因为暂时不需要交替,无条件执行post:a
-        //while break;
-        //sem_post(&int_sem_rxa);
-    }
-    return NULL;
 }
 
 //open such device func:
@@ -80,17 +53,29 @@ void dev_open_fun()
     control_fd = open_control("/dev/xdma0_bypass");           //打开bypass字符设备
     control_base = mmap_control(control_fd, MAP_BYPASS_SIZE); //获取bypass映射的内存地址
 
-    c2h_fd = open(DEVICE_NAME_C2H_0, O_RDONLY | O_NONBLOCK); //打开pcie c2h设备
-    if (c2h_fd == -1)
+    c2h_fd[0] = open(DEVICE_NAME_C2H_0, O_RDONLY | O_NONBLOCK); //打开pcie c2h设备
+    if (c2h_fd[0] == -1)
     {
         printf("PCIe c2h device open failed!\n");
     }
     else
         printf("PCIe c2h device open successful!\n");
 
-    mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, c2h_fd, 0);
+    mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, c2h_fd[0], 0);
 
-    printf("c2h device Memory map successful!\n");
+    printf("c2h0 device Memory map successful!\n");
+
+    c2h_fd[1] = open(DEVICE_NAME_C2H_1, O_RDONLY | O_NONBLOCK); //打开pcie c2h_1设备
+    if (c2h_fd[1] == -1)
+    {
+        printf("PCIe c2h_1 device open failed!\n");
+    }
+    else
+        printf("PCIe c2h_1 device open successful!\n");
+
+    mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, c2h_fd[1], 0);
+
+    printf("c2h[1] device Memory map successful!\n");
 
     h2c_fd = open(DEVICE_NAME_H2C_0, O_WRONLY | O_NONBLOCK); //打开pcie  h2c设备
     if (h2c_fd == -1)
@@ -237,7 +222,6 @@ int main(){
     work = 1;
 
     pthread_create(&event_thread, NULL, (void *(*)(void *))event_process, NULL);
-    pthread_create(&rx_thread, NULL, (void *(*)(void *))rx_process, NULL);
     ptd_create(&part_ptd, CPU_CORE - 2, (void *)data_part);
     ptd_create(&send_ptd, CPU_CORE - 1, (void *)data_send_func);
 
@@ -246,8 +230,8 @@ int main(){
         switch (sig)
         {
         case 'w':
-            lseek(c2h_fd, pos, SEEK_SET);
-            read(c2h_fd, pData[0], 4 * 1024);
+            lseek(c2h_fd[0], 0, SEEK_SET);
+            read(c2h_fd[0], pData[0], 4 * 1024);
             printf("Read data successful!\n");
 
             for (int i = 0; i < 1024; i++)
@@ -300,7 +284,8 @@ int main(){
     }
     work = 0;
 
-    close(c2h_fd);
+    close(c2h_fd[0]);
+    close(c2h_fd[1]);
     close(h2c_fd);
     close(control_fd);
     close(interrupt_fd);

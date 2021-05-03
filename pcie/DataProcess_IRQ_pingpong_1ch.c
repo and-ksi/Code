@@ -28,11 +28,10 @@
 #define DEVICE_NAME_H2C_1 "/dev/xdma0_h2c_1"
 #define DEVICE_NAME_C2H_1 "/dev/xdma0_c2h_1"
 
-#define MAP_SIZE        (0x7FFFFFFF)//8bit 2GB
+#define MAP_SIZE        (0x7FFFFFFF)//8bit 2GB  ;int max value
 #define MAP_BYPASS_SIZE (4*1024)
 #define IMG_RAM_POS     (0)
 #define RX_SIZE         (50*1024*1024)//1byte 8bit
-
 
 pthread_t event_thread;
 pthread_t rx_thread_0;
@@ -41,8 +40,9 @@ pthread_t speed_ptd;
 
 int work;
 
-int c2h_fd_0 ;
-int c2h_fd_1 ;
+
+
+int c2h_fd[2];
 
 int h2c_fd ;
 int control_fd;
@@ -171,8 +171,8 @@ void *rx_process_0( )
     {
         sem_wait(&int_sem_rx[0]);
         printf("read_end_addr = %x \n",read_end_addr);
-        lseek(c2h_fd_0, (read_end_addr - 50*1024*1024), SEEK_SET);
-        read(c2h_fd_0, pData_0, 25*1024*1024);//10MB
+        lseek(c2h_fd[0], (read_end_addr - 50*1024*1024), SEEK_SET);
+        read(c2h_fd[0], pData_0, 25*1024*1024);//10MB
         cnt = cnt +1;
         printf("cnt = %d\n",cnt);
     }
@@ -185,8 +185,8 @@ void *rx_process_1( )
     {
         sem_wait(&int_sem_rx[1]);
         printf("read_end_addr = %x \n",read_end_addr);
-        lseek(c2h_fd_1, (read_end_addr - 25*1024*1024), SEEK_SET);
-        read(c2h_fd_1, pData_1, 25*1024*1024);//10MB
+        lseek(c2h_fd[1], (read_end_addr - 25*1024*1024), SEEK_SET);
+        read(c2h_fd[1], pData_1, 25*1024*1024);//10MB
         //cnt = cnt +1;
         //printf("cnt = %d\n",cnt);
     }
@@ -206,27 +206,27 @@ int main(int argc, char *argv[])
     control_fd = open_control("/dev/xdma0_bypass");//打开bypass字符设备
     control_base = mmap_control(control_fd,MAP_BYPASS_SIZE);//获取bypass映射的内存地址
     
-    c2h_fd_0 = open(DEVICE_NAME_C2H_0, O_RDONLY | O_NONBLOCK);//打开pcie c2h_0设备
-    if(c2h_fd_0 == -1)
+    c2h_fd[0] = open(DEVICE_NAME_C2H_0, O_RDONLY | O_NONBLOCK);//打开pcie c2h_0设备
+    if(c2h_fd[0] == -1)
     {
         printf("PCIe c2h_0 device open failed!\n");
     }
     else
         printf("PCIe c2h_0 device open successful!\n"); 
 
-    mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, c2h_fd_0, 0);
+    mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, c2h_fd[0], 0);
    
     printf("c2h_0 device Memory map successful!\n");
     
-    c2h_fd_1 = open(DEVICE_NAME_C2H_1, O_RDONLY | O_NONBLOCK);//打开pcie c2h_1设备
-    if(c2h_fd_1 == -1)
+    c2h_fd[1] = open(DEVICE_NAME_C2H_1, O_RDONLY | O_NONBLOCK);//打开pcie c2h_1设备
+    if(c2h_fd[1] == -1)
     {
         printf("PCIe c2h_1 device open failed!\n");
     }
     else
         printf("PCIe c2h_1 device open successful!\n"); 
 
-    mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, c2h_fd_1, 0);
+    mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, c2h_fd[1], 0);
    
     printf("c2h_1 device Memory map successful!\n");
     
@@ -255,8 +255,8 @@ int main(int argc, char *argv[])
     	switch(inp)
     	{
     	case'w':
-    	    lseek(c2h_fd_0,0, SEEK_SET);
-    	    read(c2h_fd_0, pData_0, 4*1024);
+    	    lseek(c2h_fd[0],0, SEEK_SET);
+    	    read(c2h_fd[0], pData_0, 4*1024);
             printf("Read data successful!\n");
 
             for(int i=0;i<1024;i++)
@@ -310,8 +310,8 @@ int main(int argc, char *argv[])
     }
     work = 0;
     
-    close(c2h_fd_0);
-    close(c2h_fd_1);
+    close(c2h_fd[0]);
+    close(c2h_fd[1]);
     close(h2c_fd);
     close(control_fd);
     close(interrupt_fd);
