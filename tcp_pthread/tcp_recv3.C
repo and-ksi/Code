@@ -80,7 +80,7 @@ void *data_analys()
     int mark = 0;
     int ret_len;
 
-    channel[0] = channel[1] = -1; //channel不相同，自用，相同，转存另一个
+    channel[0] = channel[1] = -1; //channel不相同，不变，相同，转存另一个
 
     bit_head_read(pack_rec, 'b');
     cpy_length = 1;

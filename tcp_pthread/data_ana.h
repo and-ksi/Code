@@ -66,7 +66,7 @@ double cal_position(unsigned int *s1, unsigned int *s2)
 //需要传入指向指针数组的指针
 //channel: X1, X2, Y1, Y2, X3, X4, Y3, Y4
 //延迟块间4ns, 间距3mm, 从一端到另一端完整132ns
-double cal_energy(unsigned int *_in[8])
+double cal_energy(unsigned int **_in)
 {
     double s[4];//s0, s1, s2, s3; xup, yup, xdo, ydo
     for (int i = 0; i < 4; i++)

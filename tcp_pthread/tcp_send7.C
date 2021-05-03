@@ -27,7 +27,7 @@ int socket_fd;
 struct sockaddr_in clientaddr[CLIENT_NUM];
 
 int total_count;
-int past_count[CLIENT_NUM] = {0};
+int past_count[CLIENT_NUM] = {0};//pasted_count
 
 /*中断处理进程*/
 void *event_process()
