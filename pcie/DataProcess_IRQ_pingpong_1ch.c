@@ -1,3 +1,4 @@
+#include <sys/mman.h>
 #include <assert.h>
 #include <time.h>
 #include <fcntl.h>
@@ -18,10 +19,8 @@
 #include <pthread.h>
 #include <sched.h>
 #include <semaphore.h>
-#include <sys/mman.h>
 #include <errno.h>
 #include <pthread.h>
-#include <sys/mman.h>
 
 
 #define DEVICE_NAME_H2C_0 "/dev/xdma0_h2c_0"
@@ -32,16 +31,19 @@
 #define MAP_SIZE        (0x7FFFFFFF)//8bit 2GB
 #define MAP_BYPASS_SIZE (4*1024)
 #define IMG_RAM_POS     (0)
-#define RX_SIZE         (10*1024*1024)//1byte 8bit
+#define RX_SIZE         (50*1024*1024)//1byte 8bit
 
 
 pthread_t event_thread;
-pthread_t rx_thread;
+pthread_t rx_thread_0;
+pthread_t rx_thread_1;
 pthread_t speed_ptd;
 
 int work;
 
-int c2h_fd ;
+int c2h_fd_0 ;
+int c2h_fd_1 ;
+
 int h2c_fd ;
 int control_fd;
 void *control_base;
@@ -49,12 +51,12 @@ int interrupt_fd;
 
 int read_end_addr;
 
-int pData_0[RX_SIZE/4];
-int pData_1[RX_SIZE/4];
+int pData_0[RX_SIZE/8];
+int pData_1[RX_SIZE/8];
 
 int cnt;
 
-static sem_t int_sem_rx;
+static sem_t int_sem_rx[2];
 
 
 /*开中断*/
@@ -126,7 +128,8 @@ void *event_process()
         read_event(interrupt_fd);  //获取用户中断
         read_end_addr = read_control(control_base,0x0008);//read interrupt reg
         write_control(control_base,0x0000,0xFFFFFFFF);//ack interrupt
-        sem_post(&int_sem_rx);//release signal
+        sem_post(&int_sem_rx[0]);//release signal
+        sem_post(&int_sem_rx[1]);//release signal
         //printf("read_end_addr = %x \n",read_end_addr);
         //lseek(c2h_fd, read_end_addr, SEEK_SET);
         //read(c2h_fd, pData_0, 32*1024);
@@ -151,29 +154,43 @@ void *speed_test()
         time1 = systime.tv_sec;
         if(time1 - time2 >= 1) 
         {
-            speed1 = (10 * (cnt - cnt1));
-            speed2 = ((10 * cnt)/(time1 - starttime));
+            speed1 = (50 * (cnt - cnt1));
+            speed2 = ((50 * cnt)/(time1 - starttime));
             printf("%ld s, speed in one sec:%d MB/s, speed average:%d MB/s\n",
              time1 - starttime, speed1, speed2);
             time2 = time1;
             cnt1 = cnt;
         }
     }
+    pthread_exit(0);
 }
 
-void *rx_process( )
+void *rx_process_0( )
 {
-	struct timeval sstime;
-	long time0;
     while(work == 1)
     {
-        sem_wait(&int_sem_rx);
+        sem_wait(&int_sem_rx[0]);
         printf("read_end_addr = %x \n",read_end_addr);
-        lseek(c2h_fd, read_end_addr, SEEK_SET);
-        read(c2h_fd, pData_0, RX_SIZE);
+        lseek(c2h_fd_0, (read_end_addr - 50*1024*1024), SEEK_SET);
+        read(c2h_fd_0, pData_0, 25*1024*1024);//10MB
         cnt = cnt +1;
         printf("cnt = %d\n",cnt);
     }
+    pthread_exit(0);
+}
+
+void *rx_process_1( )
+{
+    while(work == 1)
+    {
+        sem_wait(&int_sem_rx[1]);
+        printf("read_end_addr = %x \n",read_end_addr);
+        lseek(c2h_fd_1, (read_end_addr - 25*1024*1024), SEEK_SET);
+        read(c2h_fd_1, pData_1, 25*1024*1024);//10MB
+        //cnt = cnt +1;
+        //printf("cnt = %d\n",cnt);
+    }
+    pthread_exit(0);
 }
 
 int main(int argc, char *argv[])
@@ -183,22 +200,35 @@ int main(int argc, char *argv[])
     
     unsigned int cnontrol_3;
     
-    sem_init(&int_sem_rx, 0, 0);
+    sem_init(&int_sem_rx[0], 0, 0);
+    sem_init(&int_sem_rx[1], 0, 0);
     
     control_fd = open_control("/dev/xdma0_bypass");//打开bypass字符设备
     control_base = mmap_control(control_fd,MAP_BYPASS_SIZE);//获取bypass映射的内存地址
     
-    c2h_fd = open(DEVICE_NAME_C2H_0, O_RDONLY | O_NONBLOCK);//打开pcie c2h设备
-    if(c2h_fd == -1)
+    c2h_fd_0 = open(DEVICE_NAME_C2H_0, O_RDONLY | O_NONBLOCK);//打开pcie c2h_0设备
+    if(c2h_fd_0 == -1)
     {
-        printf("PCIe c2h device open failed!\n");
+        printf("PCIe c2h_0 device open failed!\n");
     }
     else
-        printf("PCIe c2h device open successful!\n"); 
+        printf("PCIe c2h_0 device open successful!\n"); 
 
-    mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, c2h_fd, 0);
+    mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, c2h_fd_0, 0);
    
-    printf("c2h device Memory map successful!\n");
+    printf("c2h_0 device Memory map successful!\n");
+    
+    c2h_fd_1 = open(DEVICE_NAME_C2H_1, O_RDONLY | O_NONBLOCK);//打开pcie c2h_1设备
+    if(c2h_fd_1 == -1)
+    {
+        printf("PCIe c2h_1 device open failed!\n");
+    }
+    else
+        printf("PCIe c2h_1 device open successful!\n"); 
+
+    mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, c2h_fd_1, 0);
+   
+    printf("c2h_1 device Memory map successful!\n");
     
     h2c_fd = open(DEVICE_NAME_H2C_0, O_WRONLY | O_NONBLOCK);//打开pcie  h2c设备
     if(h2c_fd == -1)
@@ -215,7 +245,8 @@ int main(int argc, char *argv[])
     work = 1;
     
     pthread_create(&event_thread, NULL, event_process, NULL);
-    pthread_create(&rx_thread, NULL, rx_process, NULL);
+    pthread_create(&rx_thread_0, NULL, rx_process_0, NULL);
+    pthread_create(&rx_thread_1, NULL, rx_process_1, NULL);
     pthread_create(&speed_ptd, NULL, speed_test, NULL);
     
     while(inp!='o')
@@ -224,8 +255,8 @@ int main(int argc, char *argv[])
     	switch(inp)
     	{
     	case'w':
-    	    lseek(c2h_fd,pos, SEEK_SET);
-    	    read(c2h_fd, pData_0, 4*1024);
+    	    lseek(c2h_fd_0,0, SEEK_SET);
+    	    read(c2h_fd_0, pData_0, 4*1024);
             printf("Read data successful!\n");
 
             for(int i=0;i<1024;i++)
@@ -262,24 +293,25 @@ int main(int argc, char *argv[])
         break;
         
         case'g':
-    	    memcpy(pData_1, pData_0, sizeof(pData_1));
-    	    FILE *fp;
-    	    fp = fopen("data.log", "w+");
-    	    if(fp == NULL)
-    	    {
-    	    	printf("File open failed!");
-    	    	break;
-    	    }
-    	    fwrite(pData_1, 1, sizeof(pData_1), fp);
-    	    fclose(fp);
-    	    memset(pData_1, '0', sizeof(pData_1));
+    	    //memcpy(pData_1, pData_0, sizeof(pData_1));
+    	    //FILE *fp;
+    	    //fp = fopen("data.log", "w+");
+    	    //if(fp == NULL)
+    	    //{
+    	    //	printf("File open failed!");
+    	    //	break;
+    	    //}
+    	    //fwrite(pData_1, 1, sizeof(pData_1), fp);
+    	    //fclose(fp);
+    	    //memset(pData_1, '0', sizeof(pData_1));
         break;
     	}
     
     }
     work = 0;
     
-    close(c2h_fd);
+    close(c2h_fd_0);
+    close(c2h_fd_1);
     close(h2c_fd);
     close(control_fd);
     close(interrupt_fd);
