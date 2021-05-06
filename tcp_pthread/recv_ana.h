@@ -26,8 +26,6 @@
 #include <time.h>
 #include <unistd.h>
 
-
-
 #define DEVICE_NAME_H2C_0 "/dev/xdma0_h2c_0"
 #define DEVICE_NAME_C2H_0 "/dev/xdma0_c2h_0"
 #define DEVICE_NAME_H2C_1 "/dev/xdma0_h2c_1"
@@ -226,15 +224,8 @@ long long bit_head_read(unsigned int *in_, char sig_0){
         break;
 
     case 't':
-        for (i = 31; i > -1; i--)
-        {
-            ret = ret | (((*(in_ + 1) >> 31 - i) & 1) << i + 32);
-        }
-        for (i = 31; i > -1; i--)
-        {
-            ret = ret | (((*(in_ + 2) >> 31 - i) & 1) << i);
-        }
-        return ret;
+        ret = ret | (((long long)bit_read(in_ + 1, 32, 32)) << 32);
+        return ret | bit_read(in_ + 2, 32, 32);
         break;
 
     case 'b':
