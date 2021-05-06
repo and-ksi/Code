@@ -199,17 +199,11 @@ static uint32_t read_control(void *base_addr, int offset)
     return read_result;
 }
 
-unsigned int getbitr_fun(unsigned int *in, int lo, int si){
+unsigned int bit_read(unsigned *in_, int lo, int si){
     unsigned int ret = 0;
-    ret = (unsigned int)(ldexp(1, si) - 1) & *in >> lo;
-    return ret;
-}
-
-//useless
-unsigned int getbitl_fun(unsigned int *in, int lo, int si)
-{
-    unsigned int ret = 0;
-    //ret =  - 1) & *in << lo;
+    for(int i = si - 1; i > -1; i--){
+        ret = ret | (((*in_ >> (lo - 1 - i)) & 1) << i);
+    }
     return ret;
 }
 
@@ -218,39 +212,45 @@ long long bit_head_read(unsigned int *in_, char sig_0){
         printf("Bit read error!\n");
         return 0;
     }
-    long long ret;
+    long long ret = 0, ret1 = 0;
+    unsigned int mid = 0;
+    int i;
     switch (sig_0)
     {
     case 'c':
-        return getbitr_fun(in_, 24, 8);
+        return bit_read(in_, 32, 8);
         break;
 
     case 'l':
-        return getbitr_fun(in_, 0, 16);
+        return bit_read(in_, 16, 16);
         break;
 
     case 't':
-        ret = getbitr_fun(in_ + 2, 0, 32);
-        ret = getbitr_fun(in_ + 1, 0, 32) | ret << 32;
+        for (i = 31; i > -1; i--)
+        {
+            ret = ret | (((*(in_ + 1) >> 31 - i) & 1) << i + 32);
+        }
+        for (i = 31; i > -1; i--)
+        {
+            ret = ret | (((*(in_ + 2) >> 31 - i) & 1) << i);
+        }
         return ret;
         break;
 
     case 'b':
         printf("**********BOARD INFO**********\n");
-        printf("Board type:%d \nBoard addr:%d\nBoard Ftype:%d\nBoard Error:%d\n\n",
-         getbitr_fun(in_, 24, 8), getbitr_fun(in_, 16, 8), 
-         getbitr_fun(in_, 14, 2), getbitr_fun(in_, 0, 14));
+        printf("Board type:%x \nBoard addr:%x\nBoard Ftype:%x\nBoard Error:%x\n\n",
+         bit_read(in_, 32, 8), bit_read(in_, 24, 8), 
+         bit_read(in_, 16, 2), bit_read(in_, 14, 14));
         return 0;
         break;
 
     case 'f':
         printf("**********FRAME INFO**********\n");
-        printf("channel_id: %d\nError: %d\nFtype: %d\nLength: %d\n",
-         getbitr_fun(in_, 24, 8), getbitr_fun(in_, 18, 6), getbitr_fun(in_, 16, 2), 
-         getbitr_fun(in_, 0, 16));
-        ret = getbitr_fun(in_ + 2, 0, 32);
-        ret = getbitr_fun(in_ + 1, 0, 32) | ret << 32;
-        printf("Timestamp: %lld\n\n", ret);
+        printf("channel_id: %x\nError: %x\nFtype: %x\nLength: %x\nTimestamp: %x\n\n",
+               bit_head_read(in_, 'c'), bit_read(in_, 24, 6), bit_read(in_, 18, 2),
+               bit_read(in_, 16, 16), bit_head_read(in_, 't'));
+        
 
     default:
         printf("sig_0 error!\n");
@@ -260,7 +260,7 @@ long long bit_head_read(unsigned int *in_, char sig_0){
 }
 
 //need adc data int
-unsigned int bit_data_read(unsigned int *in_, char sig_1, int d)
+int bit_data_read(unsigned int *in_, char sig_1, int d)
 {
     if (in_ == NULL)
     {
@@ -271,12 +271,12 @@ unsigned int bit_data_read(unsigned int *in_, char sig_1, int d)
     if(d == 0){
         switch (sig_1)
         {
-        case 'l':
-            return getbitr_fun(in_, 16, 12);
+        case 'd':
+            return bit_read(in_, 28, 12);
             break;
 
         case 'c':
-            return getbitr_fun(in_, 28, 4);
+            return bit_read(in_, 32, 4);
 
         default:
             return 0;
@@ -285,12 +285,12 @@ unsigned int bit_data_read(unsigned int *in_, char sig_1, int d)
     }else{
         switch (sig_1)
         {
-        case 'l':
-            return getbitr_fun(in_, 0, 12);
+        case 'd':
+            return bit_read(in_, 14, 12);
             break;
 
         case 'c':
-            return getbitr_fun(in_, 12, 4);
+            return bit_read(in_, 16, 4);
 
         default:
             return 0;
@@ -307,16 +307,8 @@ double bit_float_read(unsigned int *in_, int d)
         return 0;
     }
     int ret;
-    if (d == 0)
-    {
-        ret = getbitr_fun(in_, 16, 12);
-        return (-5. + (double)ret * ((double)(ldexp(1, 12) - 1) / (double)10));
-    }
-    else
-    {
-        ret = getbitr_fun(in_, 0, 12);
-        return (-5. + (double)ret * ((double)(ldexp(1, 12) - 1) / (double)10));
-    }
+    ret = bit_data_read(in_, 'd', d);
+    return (-5. + (double)ret * ((double)(ldexp(1, 12) - 1) / (double)10));
 }
 
 #endif
