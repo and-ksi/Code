@@ -26,7 +26,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#endif
+
 
 #define DEVICE_NAME_H2C_0 "/dev/xdma0_h2c_0"
 #define DEVICE_NAME_C2H_0 "/dev/xdma0_c2h_0"
@@ -43,14 +43,14 @@
 #define CPU_CORE (4) //CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
 #define CLIENT_NUM (7)
 
-typedef struct board_head
+typedef struct _board_head
 {
     int board_type;//8
     int board_addr;//8
     int Ftype;//2
     int Error;//14
 } BOARD_HEAD;
-typedef struct frame_head
+typedef struct _frame_head
 {
     int channel_id;//8
     int error;//6
@@ -94,12 +94,12 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
 		perror("Setscope fail");
 		exit(1);
 	} */
-    ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); //线程分离属性:PTHREAD_CREATE_JOINABLE（非分离）
+    /* ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); //线程分离属性:PTHREAD_CREATE_JOINABLE（非分离）
     if (ret < 0)
     {
         perror("Detached fail");
         exit(1);
-    }
+    } */
 
     pthread_create(arg, &attr, (void *(*)(void *))functionbody, NULL);
     //printf("Id为%d的线程已创建完毕。", *arg);
@@ -319,3 +319,4 @@ double bit_float_read(unsigned int *in_, int d)
     }
 }
 
+#endif

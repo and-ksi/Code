@@ -12,10 +12,7 @@ int read_end_addr;
 unsigned int pData[2][RX_SIZE / 8]; //25M / 4 * 32 bit     count
                                     //10M / 4 * 4 MB       size
 
-static sem_t int_sem_rxa;//init 1
-static sem_t int_sem_rxb;//init 0
-static sem_t int_sem_rxc;//init 1
-static sem_t int_sem_rxd;//init 0
+static sem_t sem[4];
 
 //准备发往各个客户端的二维数组
 unsigned int pack_send[CHANNEL_NUM][PACK_SIZE];
@@ -26,8 +23,10 @@ int port = 10000;
 int socket_fd;
 struct sockaddr_in clientaddr[CLIENT_NUM];
 
+//数据分发计数
 int total_count;
 int past_count[CLIENT_NUM] = {0};//pasted_count
+int cpy_count;
 
 /*中断处理进程*/
 void *event_process()
@@ -35,14 +34,31 @@ void *event_process()
     interrupt_fd = open_event("/dev/xdma0_events_0"); //打开用户中断
     while (work == 1)
     {
-        sem_wait(&int_sem_rxa);
+        sem_wait(&sem[0]);
+        sem_wait(&sem[0]);
         //printf("Start read interrupt !\n");
         read_event(interrupt_fd);                           //获取用户中断
         read_end_addr = (int)read_control(control_base, 0x0008); //read interrupt reg
         write_control(control_base, 0x0000, 0xFFFFFFFF);    //ack interrupt
         
 
-        sem_post(&int_sem_rxb); //release signal
+        sem_post(&sem[1]); //release signal
+        sem_post(&sem[1]);
+    }
+    pthread_exit(0);
+}
+
+void *rx_process(int id)
+{
+    while (work == 1)
+    {
+        sem_wait(&sem[4]);
+        sem_wait(&sem[1]);
+        //printf("read_end_addr = %x \n", read_end_addr);
+        lseek(c2h_fd[id], (read_end_addr - (50 - id * 25) * 1024 * 1024), SEEK_SET);
+        read(c2h_fd[id], pData[id], sizeof(pData[id])); //10MB
+        sem_post(&sem[0]);
+        sem_post(&sem[2]);
     }
     pthread_exit(0);
 }
@@ -99,7 +115,7 @@ int cci(int id){
 void *data_send_func(int *count__){
     int ret;
     while(work == 1){
-        sem_wait(&int_sem_rxd);
+        sem_wait(&sem[3]);
         for (int i = 0; i < CLIENT_NUM; i++)
         {
             ret = send(acfd[i], pack_send[i], past_count[i], 0);
@@ -110,7 +126,7 @@ void *data_send_func(int *count__){
         }
         *count__++;
         memset(past_count, 0, sizeof(past_count));
-        sem_post(&int_sem_rxc);
+        sem_post(&sem[2]);
     }
     return NULL;
 }
@@ -162,65 +178,94 @@ void socket_create()
 }
 
 //part operation function
-void part_operation(unsigned int *ddata, int si, int *_cpy_cnt, int *p_cnt){
-    int _channel_, _length;
-    while (*_cpy_cnt < RX_SIZE / 4){
-        if ((_length = bit_head_read(ddata + *_cpy_cnt, 'l')) == 0)
+void part_operation(unsigned int *ddata, int si){
+    int _channel, _length;
+    while (cpy_count < si){
+        for (int i = 0; i < 1030; i++)
         {
-            break;
+            if ((*(ddata + i) - 0x040000FF) == 0 && *(ddata + i + 1) == 0)
+            {
+                printf("Get correct head!   %d\n", i);
+                cpy_count += i + 1;//conduct 0x040000ff and board_head
+                break;
+            }else if (i > 1025)
+            {
+                printf("Read head error!\n");
+                exit(1);
+            }
         }
-        _channel_ = bit_head_read(ddata + *_cpy_cnt, 'c');
-        memcpy(pack_send[cci(_channel_)] + *p_cnt, ddata + *_cpy_cnt, 4 * _length);
-        *(p_cnt + cci(_channel_)) += _length + 1;
-        *_cpy_cnt += _length + 1;
+        for(int i = 0; i < CLIENT_NUM; i++){
+            pack_send[i][past_count[i]] = *(ddata + cpy_count);
+            past_count[i]++;
+        }
+        cpy_count++;
+        for(int i = cpy_count; cpy_count - i < 1023;){
+            _length = bit_head_read(ddata + cpy_count, 'l');
+            if (_length == 0 || _length < 3)
+            {
+                printf("Data read error!\n");
+                break;
+            }
+            _channel = bit_head_read(ddata + cpy_count, 'c');
+            memcpy(pack_send[cci(_channel)] + past_count[cci(_channel)],
+             ddata + cpy_count, _length + 3);
+            past_count[cci(_channel)] += _length + 1;//length 包括数据数量以及两个时间戳
+            cpy_count += _length + 1;
+            while(*(ddata + cpy_count) == 0){
+                cpy_count++;
+            }
+        }
+        for(int i = 0; i < CLIENT_NUM; i++){
+            *(pack_send[i] + past_count[i]) = 0xffffffff;
+            past_count[i]++;
+        }
     }
+    cpy_count = 0;
 }
 
 //part data to each client
-//wait33 --> post1;post2
 void *data_part(){
-    int cpy_count;
+    cpy_count = 0;
     int pid;
 
     memset(&pack_send, 0, sizeof(pack_send));
-    sem_wait(&int_sem_rxc);//only for add board info to pack_send
-    for(int i = 0; i < CLIENT_NUM; i++){
-        pack_send[i][0] = pData[0][0];
-        past_count[i]++;
-    }
-    cpy_count++;
-    sem_post(&int_sem_rxc);
-    sem_post(&int_sem_rxc);
     while(work == 1){
         pid = pid & 1;
-        sem_wait(&int_sem_rxc);//等待添加pData[1]...的处理
-        sem_wait(&int_sem_rxc);
-        part_operation(pData[0], RX_SIZE / 4, &cpy_count, past_count);
-        sem_post(&int_sem_rxb);
-        sem_post(&int_sem_rxd);
-        cpy_count = 0;
+        sem_wait(&sem[2]);
+        sem_wait(&sem[2]);
+        sem_wait(&sem[2]);
+        part_operation(pData[0], sizeof(pData[0]));
+        part_operation(pData[1], sizeof(pData[1]));
+        sem_post(&sem[3]);
+        sem_post(&sem[3]);
+        sem_post(&sem[3]);
         pid++;
     }
     return NULL;
 }
 
 int main(){
-    sem_init(&int_sem_rxa, 0, 1);
-    sem_init(&int_sem_rxb, 0, 0);
-    sem_init(&int_sem_rxc, 0, 1);
-    sem_init(&int_sem_rxd, 0, 0);
+    sem_init(sem , 0, 2);
+    sem_init(sem + 1, 0, 0);
+    sem_init(sem + 2, 0, 1);
+    sem_init(sem + 3, 0, 2);//注意让两个read先使用这个信号,否则出bug
 
     char sig;
+
+    //debug参数?
     unsigned int pos = 0;
     unsigned int cnontrol_3;
 
-    pthread_t event_thread, rx_thread;
+    pthread_t event_thread, rx_thread[2];
     pthread_t part_ptd, send_ptd;
 
     dev_open_fun();
     socket_create();
     work = 1;
 
+    for(int i = 0; i < 2; i++){
+        pthread_create(rx_thread + i, 0, (void *(*)(void *))rx_thread, &i);
+    }
     pthread_create(&event_thread, NULL, (void *(*)(void *))event_process, NULL);
     ptd_create(&part_ptd, CPU_CORE - 2, (void *)data_part);
     ptd_create(&send_ptd, CPU_CORE - 1, (void *)data_send_func);
@@ -289,5 +334,9 @@ int main(){
     close(h2c_fd);
     close(control_fd);
     close(interrupt_fd);
+    for(int i = 0; i < CLIENT_NUM; i++){
+        close(acfd[i]);
+    }
+    close(socket_fd);
     return 0;
 }

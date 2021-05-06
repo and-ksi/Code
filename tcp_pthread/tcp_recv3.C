@@ -1,8 +1,7 @@
 #include "recv_ana.h"
 #include "data_ana.h"
 
-static sem_t int_sem_rxa; //init 1
-static sem_t int_sem_rxb; //init 0
+static sem_t sem[2];
 
 //about socket
 char IP[] = "192.168.3.1";
@@ -12,9 +11,11 @@ int connect_fd;
 
 int global_alarm;
 
+//数据读取计数
 int recv_count;
 int read_length;
 int cpy_length;
+
 unsigned int data_pack[2][PACK_SIZE];
 unsigned int pack_rec[PACK_SIZE];
 int channel[2];
@@ -58,25 +59,70 @@ void *pack_recv()
 
     while (global_alarm != -1)
     {
-        sem_wait(&int_sem_rxa);
+        sem_wait(sem);
         ret = recv(socket_fd, pack_rec, sizeof(pack_rec), 0);
         if (ret < 0)
         {
             printf("Recv fail! recv_count: %d \n", recv_count);
             exit(1);
         }
-        sem_post(&int_sem_rxb);
+        sem_post(sem + 1);
         recv_count++;
     }
     return NULL;
 }
 
+//临时数据处理
+void *data_analys_ls(){
+    printf("Ana 线程已创建!\n");
+
+    int mark = 0;
+    int ret_len;
+    int _length;
+
+    cpy_length = 0;
+
+    while (global_alarm != -1)
+    {
+        sem_wait(sem + 1);
+        while (cpy_length < PACK_SIZE)
+        {
+            for (int i = 0; i < 1030; i++)
+            {
+                if ((pack_rec[i] - 0x040000FF) == 0 && pack_rec[i + 1] == 0)
+                {
+                    printf("Get correct head!   %d\n", i);
+                    cpy_length += i + 1; //conduct 0x040000ff and board_head
+                    break;
+                }
+                else if (i > 1025)
+                {
+                    printf("Read head error!\n");
+                    exit(1);
+                }
+            }
+            bit_head_read(pack_rec + cpy_length, 'b');
+            cpy_length++;
+            printf("仅显示前4个ADC_head info!\n");
+            for(int i = 0; i < 4; i++){
+                bit_head_read(pack_rec + cpy_length, 'f');
+                _length = bit_head_read(pack_rec + cpy_length, 'l');
+                cpy_length += _length;
+            }
+            while(*(pack_rec + cpy_length) != 0xffffffff){
+                _length = bit_head_read(pack_rec + cpy_length, 'l');
+                cpy_length += _length;
+            }
+        }
+        sem_post(sem);
+    }
+}
+
 //要改
-void *data_analys()
+/* void *data_analys()
 {
     printf("Ana 线程已创建!\n");
 
-    int cpy_length;
     int mark = 0;
     int ret_len;
 
@@ -115,19 +161,19 @@ void *data_analys()
         cpy_length = 0;
     }
     return NULL;
-}
+} */
 
 int main()
 {
     char sig;
 
     global_alarm = 0;
-    sem_init(&int_sem_rxa, 0, 0);
-    sem_init(&int_sem_rxb, 0, 0);
+    sem_init(sem, 0, 1);
+    sem_init(sem + 1, 0, 0);
 
     pthread_t recv_ptd, ana_ptd;
     ptd_create(&recv_ptd, 0, (void *(*))pack_recv);
-    ptd_create(&ana_ptd, 0, (void *(*))data_analys);
+    ptd_create(&ana_ptd, 0, (void *(*))data_analys_ls);
 
     while (sig != '0')
     {
