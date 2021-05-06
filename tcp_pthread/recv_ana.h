@@ -36,7 +36,7 @@
 #define MAP_SIZE (0x7FFFFFFF) //8bit 2GB    ;max value of int
 #define MAP_BYPASS_SIZE (4 * 1024)
 #define IMG_RAM_POS (0)
-#define RX_SIZE (50 * 1024 * 1024) //1byte 8bit
+#define RX_SIZE (5 * 1024 * 1024) //1byte 8bit
 
 #define PACK_SIZE (RX_SIZE / 16)
 #define CHANNEL_NUM (8)

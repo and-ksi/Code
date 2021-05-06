@@ -226,11 +226,9 @@ void part_operation(unsigned int *ddata, int si){
 //part data to each client
 void *data_part(){
     cpy_count = 0;
-    int pid;
 
     memset(&pack_send, 0, sizeof(pack_send));
     while(work == 1){
-        pid = pid & 1;
         sem_wait(&sem[2]);
         sem_wait(&sem[2]);
         sem_wait(&sem[2]);
@@ -239,7 +237,6 @@ void *data_part(){
         sem_post(&sem[3]);
         sem_post(&sem[3]);
         sem_post(&sem[3]);
-        pid++;
     }
     return NULL;
 }
