@@ -186,13 +186,13 @@ static void *mmap_control(int fd, long mapsize)
 static void write_control(void *base_addr, int offset, uint32_t val)
 {
     //uint32_t writeval = htoll(val);
-    *((uint32_t *)(base_addr + offset)) = val;
+    *((uint32_t *)((uint32_t *)base_addr + offset)) = val;
 }
 
 //read bypass deives
 static uint32_t read_control(void *base_addr, int offset)
 {
-    uint32_t read_result = *((uint32_t *)(base_addr + offset));
+    uint32_t read_result = *((uint32_t *)((uint32_t *)base_addr + offset));
     //read_result = ltohl(read_result);
     return read_result;
 }
