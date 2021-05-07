@@ -13,3 +13,4 @@ tcp_pthread/recv
 data_ana/a.out
 speed_test/tcp_speeds.log
 speed_test/udp_speeds.log
+test/bit_read

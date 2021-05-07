@@ -205,13 +205,19 @@ unsigned int bit_read(unsigned *in_, int lo, int si){
     return ret;
 }
 
-long long bit_head_read(unsigned int *in_, char sig_0){
+long long bit_time_read(unsigned int *in_)
+{
+    long long ret = 0;
+    ret = ret | (((long long)bit_read(in_ + 1, 32, 32)) << 32);
+    return (ret | bit_read(in_ + 2, 32, 32));
+}
+
+unsigned int bit_head_read(unsigned int *in_, char sig_0){
     if(in_ == NULL){
         printf("Bit read error!\n");
         return 0;
     }
-    long long ret = 0, ret1 = 0;
-    unsigned int mid = 0;
+    unsigned int ret = 0;
     int i;
     switch (sig_0)
     {
@@ -221,11 +227,6 @@ long long bit_head_read(unsigned int *in_, char sig_0){
 
     case 'l':
         return bit_read(in_, 16, 16);
-        break;
-
-    case 't':
-        ret = ret | (((long long)bit_read(in_ + 1, 32, 32)) << 32);
-        return ret | bit_read(in_ + 2, 32, 32);
         break;
 
     case 'b':
@@ -238,9 +239,9 @@ long long bit_head_read(unsigned int *in_, char sig_0){
 
     case 'f':
         printf("**********FRAME INFO**********\n");
-        printf("channel_id: %x\nError: %x\nFtype: %x\nLength: %x\nTimestamp: %x\n\n",
-               bit_head_read(in_, 'c'), bit_read(in_, 24, 6), bit_read(in_, 18, 2),
-               bit_read(in_, 16, 16), bit_head_read(in_, 't'));
+        printf("channel_id: %x\nError: %x\nFtype: %x\nLength: %d\nTimestamp: %lld\n\n",
+               bit_head_read(in_, 'c'), bit_read(in_, 22, 6), bit_read(in_, 24, 2),
+               bit_read(in_, 16, 16), bit_time_read(in_));
         
 
     default:
