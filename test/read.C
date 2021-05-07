@@ -64,21 +64,31 @@ void *rx_process()
 
 //show info
 void *show_func(){
-    int cpy_length = 0;
+    cpy_count = 0;
     int _length;
+    int _channle;
+    int cpy_count1;
+    long long _timestamp;
+    char buf[100] = {'\0'};
+    FILE *fp[CHANNEL_NUM];
+    for(int i = 0; i < CHANNEL_NUM; i++){
+        sprintf(buf, "log/c_%d.log", i);
+        fp[i] = fopen(buf, "w+");
+    }
+
     while (work == 1)
     {
         sem_wait(sem);
         for(int k = 0; k < 2; k++){
-            while (cpy_length < RX_SIZE / 8)
+            while (cpy_count < RX_SIZE / 8)
             {
-                for (int i = 0; i < 1030; i++)
+                for (int i = 0; i < 1030; i++) //检测board_head位置
                 {
-                    if ((*(pData[k] + cpy_length) - 0x040000FF) == 0
-                     && *(pData[k] + cpy_length + 1) == 0)
+                    if (*(pData[k] + cpy_count + i) == 0x00000000
+                     && *(pData[k] + cpy_count + i + 1) != 0)
                     {
                         printf("Get correct head!   %d\n", i);
-                        cpy_count += i + 1; //conduct 0x040000ff
+                        cpy_count += i; //conduct 0x040000ff and board_head
                         break;
                     }
                     else if (i > 1025)
@@ -87,23 +97,39 @@ void *show_func(){
                         exit(1);
                     }
                 }
-                bit_head_read(pData[k] + cpy_length, 'b');
-                cpy_length++;
+                bit_head_read(pData[k] + cpy_count, 'b');
+                cpy_count++;
+                cpy_count1 = cpy_count;
                 printf("仅显示前4个ADC_head info!\n");
                 for (int i = 0; i < 4; i++)
                 {
-                    bit_head_read(pData[k] + cpy_length, 'f');
-                    _length = bit_head_read(pData[k] + cpy_length, 'l');
-                    cpy_length += _length;
+                    bit_head_read(pData[k] + cpy_count, 'f');
+                    _length = bit_head_read(pData[k] + cpy_count, 'l');
+                    cpy_count += _length + 3;
                 }
-                while (*(pData[k] + cpy_length) != 0x040000ff &&
-                 *(pData[k] + cpy_length + 1) != 0)
+                cpy_count = cpy_count1;
+                while (*(pData[k] + cpy_count) != 0 &&
+                 *(pData[k] + cpy_count + 1) != 0)
                 {
-                    _length = bit_head_read(pData[k] + cpy_length, 'l');
-                    cpy_length += _length;
+                    _length = bit_head_read(pData[k] + cpy_count, 'l');
+                    _channle = bit_head_read(pData[k] + cpy_count, 'c');
+                    _timestamp = bit_head_read(pData[k] + cpy_count, 't');
+                    cpy_count += 3;
+                    for(int i = 0; i < _length; i++)
+                    {
+                        fprintf(fp[_channle], "%018d    %09.8f\n",
+                         _timestamp + i, bit_float_read(pData[k] + cpy_count + i, 0));
+                    }
+                    cpy_count += _length;
+                }
+                while (*(pData[k] + cpy_count) == 0
+                 && *(pData[k] + cpy_count + 1) != 0) //确定是否读到board最后
+                {
+                    cpy_count++;
                 }
             }
         }
+        exit(1);
         sem_post(sem + 1);
     }
     
