@@ -199,8 +199,8 @@ static uint32_t read_control(void *base_addr, int offset)
 
 unsigned int bit_read(unsigned *in_, int lo, int si){
     unsigned int ret = 0;
-    for(int i = si - 1; i > -1; i--){
-        ret = ret | (((*in_ >> (lo - 1 - i)) & 1) << i);
+    for(int i = si ; i > 0; i--){
+        ret = ret | (((*in_ >> (lo - i)) & 1) << i - 1);
     }
     return ret;
 }
