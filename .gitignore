@@ -14,3 +14,10 @@ data_ana/a.out
 speed_test/tcp_speeds.log
 speed_test/udp_speeds.log
 test/bit_read
+test/data/c_1.log
+test/data/c_2.log
+test/data/c_3.log
+test/data/c_4.log
+test/data/c_5.log
+test/data/c_6.log
+test/data/c_7.log

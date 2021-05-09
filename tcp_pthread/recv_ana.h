@@ -8,11 +8,12 @@
 #include <getopt.h>
 #include <math.h>
 #include <memory.h>
-#include <pthread.h>
-#include <sched.h>
 #include <semaphore.h>
 #include <stdint.h>
 #include <stdio.h>
+#define __USE_GNU
+#include <sched.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -208,8 +209,9 @@ unsigned int bit_read(unsigned *in_, int lo, int si){
 long long bit_time_read(unsigned int *in_)
 {
     long long ret = 0;
-    ret = ret | (((long long)bit_read(in_ + 1, 32, 32)) << 32);
-    return (ret | bit_read(in_ + 2, 32, 32));
+    //ret = ret | (((long long)bit_read(in_ + 1, 32, 32)) << 32);
+    ret = *(in_ + 1);
+    return (*(in_ + 2) | (ret << 32));
 }
 
 unsigned int bit_head_read(unsigned int *in_, char sig_0){
@@ -222,11 +224,11 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0){
     switch (sig_0)
     {
     case 'c':
-        return bit_read(in_, 32, 8);
+        return bit_read(in_, 8, 8);
         break;
 
     case 'l':
-        return bit_read(in_, 16, 16);
+        return *in_ >> 16;
         break;
 
     case 'b':
@@ -239,9 +241,9 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0){
 
     case 'f':
         printf("**********FRAME INFO**********\n");
-        printf("channel_id: %x\nError: %x\nFtype: %x\nLength: %d\nTimestamp: %lld\n\n",
-               bit_head_read(in_, 'c'), bit_read(in_, 22, 6), bit_read(in_, 24, 2),
-               bit_read(in_, 16, 16), bit_time_read(in_));
+        printf("channel_id: %x\nError: %x\nFtype: %x\nLength: %d\nTimestamp: %llx\n\n",
+               bit_head_read(in_, 'c'), bit_read(in_, 20, 6), bit_read(in_, 18, 2),
+               bit_head_read(in_, 'l'), bit_time_read(in_));
         
 
     default:
