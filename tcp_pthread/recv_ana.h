@@ -252,7 +252,7 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0){
         break;
 
     case 'l':
-        return *in_ >> 16;
+        return (*in_ >> 16);
         break;
 
     case 'b':
@@ -279,7 +279,7 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0){
     }
 }
 
-//need adc data int
+//need adc data int pointer 指向需要读取的unsigned int
 int bit_data_read(unsigned int *in_, char sig_1, int d)
 {
     if (in_ == NULL)
@@ -292,11 +292,14 @@ int bit_data_read(unsigned int *in_, char sig_1, int d)
         switch (sig_1)
         {
         case 'd':
-            return bit_read(in_, 28, 12);
+            //return bit_read(in_, 28, 12);//这是反向读取数据
+            return *in_ & 0x0fff0000;
             break;
 
         case 'c':
-            return bit_read(in_, 32, 4);
+            //return bit_read(in_, 32, 4);
+            return *in_ & 0xf0000000;
+            break;
 
         default:
             return 0;
@@ -306,11 +309,14 @@ int bit_data_read(unsigned int *in_, char sig_1, int d)
         switch (sig_1)
         {
         case 'd':
-            return bit_read(in_, 14, 12);
+            //return bit_read(in_, 14, 12);
+            return *in_ & 0x00000fff;
             break;
 
         case 'c':
-            return bit_read(in_, 16, 4);
+            //return bit_read(in_, 16, 4);
+            return *in_ & 0x0000f000;
+            break;
 
         default:
             return 0;

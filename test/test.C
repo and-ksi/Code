@@ -33,7 +33,7 @@ int main(){
 //  2.向数组中注入数字会自动在后边加入结束字符
 
 //测试信号量
-#include <stdio.h>
+/* #include <stdio.h>
 #include <string.h>
 
 #include <pthread.h>
@@ -108,4 +108,14 @@ void *funCustomer(void *arg)
     }
 
     return nullptr;
+} */
+
+//十六进制数的读取和输出
+#include <stdio.h>
+
+int main(){
+    unsigned int test[10] = {0};
+    scanf("%x", test);
+    printf("%d", *test);
+    return 0;
 }

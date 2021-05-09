@@ -108,7 +108,7 @@ void dev_open_fun()
 
 //culculate the client_num base on channel
 int cci(int id){
-    return id;
+    return id % CLIENT_NUM;
 }
 
 //data send function; how to switch client and pack_send?
@@ -180,10 +180,11 @@ void socket_create()
 //part operation function
 void part_operation(unsigned int *ddata, int si){
     int _channel, _length;
+    int swich_client;
     while (cpy_count < si){
         for (int i = 0; i < 1030; i++)//检测board_head位置
         {
-            if (*(ddata + cpy_count + i) == 0x00000000)
+            if (*(ddata + cpy_count + i) == 0 && *(ddata + cpy_count + i + 1) != 0)
             {
                 printf("Get correct head!   %d\n", i);
                 cpy_count += i;//conduct 0x040000ff and board_head
@@ -194,13 +195,15 @@ void part_operation(unsigned int *ddata, int si){
                 exit(1);
             }
         }
-        for(int i = 0; i < CLIENT_NUM; i++)//将board_head写入待发送数组
+        //将board_head写入待发送数组, 如果boardhead信息无用这段丢掉
+        for(int i = 0; i < CLIENT_NUM; i++)
         {
             pack_send[i][past_count[i]] = *(ddata + cpy_count);
             past_count[i]++;
         }
         cpy_count++;//指向board_head下第一个adc_head第一行
-        for(int i = cpy_count; cpy_count - i < 1023;)//将board下所有adc_data存入对应内存
+
+        for(int i = cpy_count; cpy_count - i < 1024;)//将board下所有adc_data存入对应内存
         {
             _length = bit_head_read(ddata + cpy_count, 'l');
             if (_length == 0 || _length < 3)
@@ -209,15 +212,17 @@ void part_operation(unsigned int *ddata, int si){
                 break;
             }
             _channel = bit_head_read(ddata + cpy_count, 'c');
-            memcpy(pack_send[cci(_channel)] + past_count[cci(_channel)],
-             ddata + cpy_count, _length + 3);
-            past_count[cci(_channel)] += _length + 3;//length 包括数据数量以及两个时间戳
+            swich_client = cci(_channel);
+            memcpy(pack_send[swich_client] + past_count[swich_client],
+                   ddata + cpy_count, _length + 3);
+            past_count[swich_client] += _length + 3; //length 包括数据数量以及头
             cpy_count += _length + 3;
             while(*(ddata + cpy_count) == 0)//确定是否读到board最后
             {
                 cpy_count++;
             }
         }
+        //如果不需要添加board之间区别,以下去掉
         for(int i = 0; i < CLIENT_NUM; i++)//接收端分析数据时读到8f结束当前board
         {
             *(pack_send[i] + past_count[i]) = 0xffffffff;
@@ -236,8 +241,8 @@ void *data_part(){
         sem_wait(&sem[2]);
         sem_wait(&sem[2]);
         sem_wait(&sem[2]);
-        part_operation(pData[0], sizeof(pData[0]));
-        part_operation(pData[1], sizeof(pData[1]));
+        part_operation(pData[0], sizeof(pData[0]) / 8);
+        part_operation(pData[1], sizeof(pData[1]) / 8);
         sem_post(&sem[3]);
         sem_post(&sem[3]);
         sem_post(&sem[3]);

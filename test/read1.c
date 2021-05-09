@@ -12,7 +12,7 @@ void file_read()
         printf("File open failed!\n");
         exit(1);
     }
-    fread(pData[0], 4, RX_SIZE / 8, fps);
+    fread(pData[0], 1, RX_SIZE, fps);
     fclose(fps);
 }
 
@@ -26,11 +26,10 @@ void show_func()
     long long _timestamp;
     char buf[100] = {'\0'};
     FILE *fp[CHANNEL_NUM];
-    for (int i = 0; i < CHANNEL_NUM; i++)
-    {
-        sprintf(buf, "data/c_%d.log", i);
-        fp[i] = fopen(buf, "w+");
-    }
+
+        sprintf(buf, "data/c_1.log");
+        fp[1] = fopen(buf, "w+");
+
 
     while (work == 1)
     {
@@ -67,24 +66,38 @@ void show_func()
                     _length = bit_head_read(pData[k] + cpy_count, 'l');
                     cpy_count += _length + 3;
                 }
+                
                 cpy_count = cpy_count1;
                 cpy_count1 = 0;
+                
                 while (*(pData[k] + cpy_count) != 0 ||
                        *(pData[k] + cpy_count + 1) != 0)
                 {
+                    
+                    //printf("cpy_count: %d\n", cpy_count);
+                    
                     _length = bit_head_read(pData[k] + cpy_count, 'l');
+                    
                     _channle = bit_head_read(pData[k] + cpy_count, 'c');
-                    _timestamp = bit_head_read(pData[k] + cpy_count, 't');
+                    
+                    _timestamp = bit_time_read(pData[k] + cpy_count);
+                    
                     cpy_count += 3;
                     for (int i = 0; i < _length; i++)
                     {
-                        fprintf(fp[_channle], "%018lld    %09.8f\n", 8 * i,
+                        printf("sllslsl     %d\n", _channle);
+                        fprintf(fp[1], "%08d    %09.8f\n", 2 * i * 8,
                          bit_float_read(pData[k] + cpy_count + i, cpy_count1 & 1));
+                        //printf("sllslsl\n");
                         cpy_count1++;
-                        fprintf(fp[_channle], "%018lld    %09.8f\n", 8 * i,
+                        fprintf(fp[1], "%08d    %09.8f\n", 2 * i * 8 + 8,
+
                          bit_float_read(pData[k] + cpy_count + i, cpy_count1 & 1));
                         cpy_count1++;
                     }
+                    fclose(fp[1]);
+                    
+                    exit(1);
                     cpy_count += _length;
                 }
                 cpy_count1 = 0;
@@ -123,6 +136,7 @@ int main(){
     } */
 
     show_func();
+    printf("sllslsl\n");
 
     return 0;
 }
