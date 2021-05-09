@@ -223,8 +223,32 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0){
     int i;
     switch (sig_0)
     {
+    case 'T'://Board_type
+        return bit_read(in_, 8, 8);
+        break;
+
+    case 'A'://Board_address
+        return bit_read(in_, 8, 8);
+        break;
+
+    case 'Y'://Board_ftype
+        return bit_read(in_, 8, 8);
+        break;
+
+    case 'E'://Board_error
+        return bit_read(in_, 8, 8);
+        break;
+
     case 'c':
         return bit_read(in_, 8, 8);
+        break;
+
+    case 'e':
+        return bit_read(in_, 14, 6);
+        break;
+
+    case 'F':
+        return bit_read(in_, 16, 2);
         break;
 
     case 'l':
@@ -242,8 +266,10 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0){
     case 'f':
         printf("**********FRAME INFO**********\n");
         printf("channel_id: %x\nError: %x\nFtype: %x\nLength: %d\nTimestamp: %llx\n\n",
-               bit_head_read(in_, 'c'), bit_read(in_, 20, 6), bit_read(in_, 18, 2),
-               bit_head_read(in_, 'l'), bit_time_read(in_));
+               bit_head_read(in_, 'c'), bit_head_read(in_, 'e'),
+                bit_head_read(in_, 'F'), bit_head_read(in_, 'l'), bit_time_read(in_));
+        return 0;
+        break;
         
 
     default:
@@ -302,7 +328,7 @@ double bit_float_read(unsigned int *in_, int d)
     }
     int ret;
     ret = bit_data_read(in_, 'd', d);
-    return (-5. + (double)ret * ((double)(ldexp(1, 12) - 1) / (double)10));
+    return (-5. + (double)ret * (10. / (double)(ldexp(1, 12) - 1)));
 }
 
 #endif

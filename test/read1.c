@@ -54,10 +54,10 @@ void show_func()
                     }
                 }
                 for( int i = 0; i < 50; i++){
-                    printf("%x\n", *(pData[0] + i));
+                    printf("%x\n", *(pData[0] + i + cpy_count));
                 }
                 
-                bit_head_read(pData[k] + cpy_count, 'b');
+                //bit_head_read(pData[k] + cpy_count, 'b');
                 cpy_count++;
                 cpy_count1 = cpy_count;
                 printf("仅显示前4个ADC_head info!\n");
@@ -68,6 +68,7 @@ void show_func()
                     cpy_count += _length + 3;
                 }
                 cpy_count = cpy_count1;
+                cpy_count1 = 0;
                 while (*(pData[k] + cpy_count) != 0 ||
                        *(pData[k] + cpy_count + 1) != 0)
                 {
@@ -77,8 +78,12 @@ void show_func()
                     cpy_count += 3;
                     for (int i = 0; i < _length; i++)
                     {
-                        fprintf(fp[_channle], "%018lld    %09.8f\n",
-                                _timestamp + i, bit_float_read(pData[k] + cpy_count + i, 0));
+                        fprintf(fp[_channle], "%018lld    %09.8f\n", 8 * i,
+                         bit_float_read(pData[k] + cpy_count + i, cpy_count1 & 1));
+                        cpy_count1++;
+                        fprintf(fp[_channle], "%018lld    %09.8f\n", 8 * i,
+                         bit_float_read(pData[k] + cpy_count + i, cpy_count1 & 1));
+                        cpy_count1++;
                     }
                     cpy_count += _length;
                 }
