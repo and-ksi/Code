@@ -9,15 +9,16 @@ int port = 10000;
 int socket_fd;
 int connect_fd;
 
-int global_alarm;
+int work;
 
 //数据读取计数
 int recv_count;
 int read_length;
-int cpy_length;
+int cpy_count;
+int time_count;
 
-unsigned int data_pack[2][PACK_SIZE];
 unsigned int pack_rec[PACK_SIZE];
+long long timestamp[PACK_SIZE / 20];
 int channel[2];
 
 //socket create functon, need global identifier:
@@ -57,10 +58,16 @@ void *pack_recv()
 
     memset(pack_rec, 0, sizeof(pack_rec));
 
-    while (global_alarm != -1)
+    while (work != -1)
     {
         sem_wait(sem);
         ret = recv(socket_fd, pack_rec, sizeof(pack_rec), 0);
+        if (ret < 0)
+        {
+            printf("Recv fail! recv_count: %d \n", recv_count);
+            exit(1);
+        }
+        ret = recv(socket_fd, timestamp, sizeof(timestamp), 0);
         if (ret < 0)
         {
             printf("Recv fail! recv_count: %d \n", recv_count);
@@ -80,19 +87,19 @@ void *data_analys_ls(){
     int ret_len;
     int _length;
 
-    cpy_length = 0;
+    cpy_count = 0;
 
-    while (global_alarm != -1)
+    while (work != -1)
     {
         sem_wait(sem + 1);
-        while (cpy_length < PACK_SIZE)
+        while (cpy_count < PACK_SIZE)
         {
             for (int i = 0; i < 1030; i++)
             {
-                if ((pack_rec[i] - 0x040000FF) == 0 && pack_rec[i + 1] == 0)
+                if (pack_rec[i] == 0 && pack_rec[i + 1] != 0)
                 {
                     printf("Get correct head!   %d\n", i);
-                    cpy_length += i + 1; //conduct 0x040000ff and board_head
+                    cpy_count += i; //conduct 0x040000ff and board_head
                     break;
                 }
                 else if (i > 1025)
@@ -101,18 +108,23 @@ void *data_analys_ls(){
                     exit(1);
                 }
             }
-            bit_head_read(pack_rec + cpy_length, 'b');
-            cpy_length++;
-            printf("仅显示前4个ADC_head info!\n");
+            bit_head_read(pack_rec + cpy_count, 'b');
+            while(timestamp[time_count] >)
+
+            //bit_head_read(pack_rec + cpy_count, 'b');
+            //cpy_count++;
+            /* printf("仅显示前4个ADC_head info!\n");
             for(int i = 0; i < 4; i++){
-                bit_head_read(pack_rec + cpy_length, 'f');
-                _length = bit_head_read(pack_rec + cpy_length, 'l');
-                cpy_length += _length;
-            }
-            while(*(pack_rec + cpy_length) != 0xffffffff){
-                _length = bit_head_read(pack_rec + cpy_length, 'l');
-                cpy_length += _length;
-            }
+                bit_head_read(pack_rec + cpy_count, 'f');
+                _length = bit_head_read(pack_rec + cpy_count, 'l');
+                cpy_count += _length;
+            } */
+            /* while(*(pack_rec + cpy_count) != 0xffffffff){
+                _length = bit_head_read(pack_rec + cpy_count, 'l');
+                cpy_count += _length;
+            } */
+
+
         }
         sem_post(sem);
     }
@@ -129,36 +141,36 @@ void *data_analys_ls(){
     channel[0] = channel[1] = -1; //channel不相同，不变，相同，转存另一个
 
     bit_head_read(pack_rec, 'b');
-    cpy_length = 1;
+    cpy_count = 1;
 
-    channel[1] = (int)bit_head_read(pack_rec + cpy_length, 'c');
+    channel[1] = (int)bit_head_read(pack_rec + cpy_count, 'c');
 
-    while (global_alarm != -1)
+    while (work != -1)
     {
         sem_wait(&int_sem_rxb);
-        while (cpy_length < PACK_SIZE)
+        while (cpy_count < PACK_SIZE)
         {
             //when adc length=0
-            if ((ret_len = bit_head_read(pack_rec + cpy_length, 'l')) == 0) 
+            if ((ret_len = bit_head_read(pack_rec + cpy_count, 'l')) == 0) 
             {
                 break;
             }
             //show adc frame head info
-            if (global_alarm == 1)
+            if (work == 1)
             {
-                bit_head_read(pack_rec + cpy_length, 'f');
+                bit_head_read(pack_rec + cpy_count, 'f');
             }
-            if(channel[0] = bit_head_read(pack_rec + cpy_length, 'c') == channel[1]){
+            if(channel[0] = bit_head_read(pack_rec + cpy_count, 'c') == channel[1]){
                 mark = 1;
             }
             //ana operation
 
-            cpy_length += bit_head_read(pack_rec + cpy_length, 'l');
+            cpy_count += bit_head_read(pack_rec + cpy_count, 'l');
             mark = 0;
         }
         memset(pack_rec, '0', PACK_SIZE);
         sem_post(&int_sem_rxa);
-        cpy_length = 0;
+        cpy_count = 0;
     }
     return NULL;
 } */
@@ -167,7 +179,8 @@ int main()
 {
     char sig;
 
-    global_alarm = 0;
+    work = 0;
+    time_count = 0;
     sem_init(sem, 0, 1);
     sem_init(sem + 1, 0, 0);
 
@@ -181,14 +194,14 @@ int main()
         switch (sig)
         {
         case '1':
-            global_alarm = 1;
+            work = 1;
             break;
 
         default:
             break;
         }
     }
-    global_alarm = -1;
+    work = -1;
     close(connect_fd);
     close(socket_fd);
     return 0;

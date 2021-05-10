@@ -3,17 +3,17 @@
 
 #include "recv_ana.h"
 
-#endif
-
 #define SQRT_SIZE               (100)//mm
 #define INTERVAL_NUM            (33)//99mm
 #define DELAY_EVERY_INTERVAL    (4)//ns
 #define SIZE_EVERY_INTERVAL     (3)//mm
-#define FREQUENCY               (20)//MHz
-#define PERIOD_CYCLE            (50)//ns    ^^^^^   与频率相关联
+#define FREQUENCY               (125)//MHz
+#define PERIOD_CYCLE            (8)//ns    ^^^^^   与频率相关联
 
 #define ATTENUATION_COEFFICIENT (1.04)
-#define DELAY_TIME              (500)//ns
+#define DELAY_TIME              (500)//ns   恒比定时延迟时间
+#define DELAY_MAX               (8*50)  //判断数据有效,上下正比室触发时间最大差值
+                                        //8ns * 50(48个数据)
 
 #define ENERGY_OF_MOUN          (105.7)
 
@@ -28,8 +28,8 @@ long long cfd_get_begintime(unsigned int *in_)
     }
 
     unsigned int _cfd[1024];
-    long long timestamp_ = bit_head_read(in_, 't');//ns
-    int _length = (int)bit_head_read(in_, 'l');
+    long long timestamp_ = bit_time_read(in_);//ns
+    int _length = bit_head_read(in_, 'l');
     for (int i = 0; i < (2 * _length); i++)
     {
         _cfd[i] = bit_data_read(in_ + (i / 2), 'l', i & 1);
@@ -51,12 +51,12 @@ long long cfd_get_begintime(unsigned int *in_)
 }
 
 //calculate position ;left+   right-
-//take the center of square as zero pointer
-//20MHz
+//take the center of square as zero point
+//125MHz
 double cal_position(unsigned int *s1, unsigned int *s2)
 {
-    long long t1 = bit_head_read(s1, 't');
-    long long t2 = bit_head_read(s2, 't');
+    long long t1 = bit_time_read(s1);
+    long long t2 = bit_time_read(s2);
 
     return ((double)(t1 - t2) * 
     (double)(SIZE_EVERY_INTERVAL / (2 * DELAY_EVERY_INTERVAL)));
@@ -86,3 +86,5 @@ double cal_energy(unsigned int **_in)
     double vv = .25 / (abs(arrive_time[0] - arrive_time[1]) * 1e-9);
     return ENERGY_OF_MOUN * vv * vv;
 }
+
+#endif

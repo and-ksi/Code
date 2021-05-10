@@ -16,6 +16,7 @@ static sem_t sem[4];
 
 //准备发往各个客户端的二维数组
 unsigned int pack_send[CLIENT_NUM][PACK_SIZE];
+long long timestamp[2][PACK_SIZE / 20];//存储发往客户端的时间戳
 
 //socket所需变量
 int acfd[CLIENT_NUM];
@@ -25,6 +26,7 @@ struct sockaddr_in clientaddr[CLIENT_NUM];
 
 //数据分发计数
 int total_count;
+int time_count[2];
 int past_count[CLIENT_NUM] = {0};//pasted_count
 int cpy_count;
 
@@ -118,10 +120,15 @@ void *data_send_func(int *count__){
         sem_wait(&sem[3]);
         for (int i = 0; i < CLIENT_NUM; i++)
         {
-            ret = send(acfd[i], pack_send[i], past_count[i], 0);
+            ret = send(acfd[i], pack_send[i], 4 * past_count[i], 0);
             if (ret < 0)
             {
                 printf("第%d次发送 : 对%d客户端 : Send failed!\n", *count__, i);
+            }
+            ret = send(acfd[i], timestamp[(8 - i) / 4], 8 * time_count[(8 - i) / 4], 0);
+            if (ret < 0)
+            {
+                printf("第%d次发送 : 对%d客户端 : Send timestamp failed!\n", *count__, i);
             }
         }
         *count__++;
@@ -212,6 +219,11 @@ void part_operation(unsigned int *ddata, int si){
                 break;
             }
             _channel = bit_head_read(ddata + cpy_count, 'c');
+            if(_channel == 0 || _channel == 4){
+                timestamp[_channel / 4][time_count[_channel / 4]] = 
+                 bit_time_read(ddata + cpy_count);
+                time_count[_channel / 4]++;
+            }
             swich_client = cci(_channel);
             memcpy(pack_send[swich_client] + past_count[swich_client],
                    ddata + cpy_count, _length + 3);
@@ -268,6 +280,7 @@ int main(){
     dev_open_fun();
     socket_create();
     work = 1;
+    time_count[0] = time_count[1] = 0;
 
     for(int i = 0; i < 2; i++){
         pthread_create(rx_thread + i, 0, (void *(*)(void *))rx_thread, &i);
