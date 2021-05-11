@@ -337,4 +337,13 @@ double bit_float_read(unsigned int *in_, int d)
     return (-5. + (double)ret * (10. / (double)(ldexp(1, 12) - 1)));
 }
 
+void *open_error_log(){
+    FILE *error_log = fopen("error_log", "w+");
+    if(error_log == NULL){
+        printf("Error log file open failed!\n");
+        exit(1);
+    }
+    return error_log;
+}
+
 #endif

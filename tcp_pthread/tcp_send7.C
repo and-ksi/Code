@@ -249,6 +249,7 @@ void *data_part(){
     cpy_count = 0;
 
     memset(&pack_send, 0, sizeof(pack_send));
+    memset(timestamp, 0, sizeof(timestamp));
     while(work == 1){
         sem_wait(&sem[2]);
         sem_wait(&sem[2]);

@@ -17,6 +17,8 @@ int read_length;
 int cpy_count;
 int time_count;
 
+FILE *error_log, *save;
+
 unsigned int pack_rec[PACK_SIZE];
 long long timestamp[PACK_SIZE / 20];
 int channel[2];
@@ -79,6 +81,31 @@ void *pack_recv()
     return NULL;
 }
 
+//get mini difference
+int difference_func(long long t_stamp){
+    int diffrence, diffrence1, m;
+    int min = 0;
+    diffrence = t_stamp - timestamp[time_count];
+    for (m = 1; m < 5; m++)
+    {
+        diffrence1 = t_stamp - timestamp[time_count + m];
+        if (abs(diffrence1) < abs(diffrence))
+        {
+            diffrence = diffrence1;
+            min++;
+        }
+    }
+    if(m == 4){
+        time_count += 4;
+        difference_func(t_stamp);
+    }else if(diffrence <= DELAY_MAX){
+        time_count += min;
+        return 1;//指其为有效数据
+    }else{
+        return 0;//为需要舍弃的数据
+    }
+}
+
 //临时数据处理
 void *data_analys_ls(){
     printf("Ana 线程已创建!\n");
@@ -86,6 +113,12 @@ void *data_analys_ls(){
     int mark = 0;
     int ret_len;
     int _length;
+
+    save = fopen("data_save.log", "w+");
+    if(save == NULL){
+        printf("File data_save.log open failed!\n");
+        exit(1);
+    }
 
     cpy_count = 0;
 
@@ -96,20 +129,38 @@ void *data_analys_ls(){
         {
             for (int i = 0; i < 1030; i++)
             {
-                if (pack_rec[i] == 0 && pack_rec[i + 1] != 0)
+                if (pack_rec[i + cpy_count] == 0 && pack_rec[i + cpy_count + 1] != 0)
                 {
                     printf("Get correct head!   %d\n", i);
-                    cpy_count += i; //conduct 0x040000ff and board_head
+                    cpy_count += i;
                     break;
                 }
                 else if (i > 1025)
                 {
                     printf("Read head error!\n");
-                    exit(1);
+                    for(int e = -50; e < 50; e++){
+                        fprintf(error_log, "%d:   %x\n", e, pack_rec[cpy_count + e]);
+                    }
+                    fclose(error_log);
                 }
             }
             bit_head_read(pack_rec + cpy_count, 'b');
-            while(timestamp[time_count] >)
+            cpy_count++;
+
+            while(pack_rec[cpy_count] != 0){
+                if(difference_func(bit_time_read(pack_rec + cpy_count))){
+                    _length = bit_head_read(pack_rec + cpy_count, 'l');
+                    fwrite(pack_rec + cpy_count, 4, _length + 3, save);
+                    cpy_count += _length + 3;
+                }else{
+                    _length = bit_head_read(pack_rec + cpy_count, 'l');
+                    cpy_count += _length + 3;
+                }
+            }
+
+            if(pack_rec[1 + cpy_count] == 0){
+                cpy_count = PACK_SIZE;
+            }
 
             //bit_head_read(pack_rec + cpy_count, 'b');
             //cpy_count++;
@@ -124,56 +175,11 @@ void *data_analys_ls(){
                 cpy_count += _length;
             } */
 
-
         }
+        memset(pack_rec, 0, sizeof(pack_rec));
         sem_post(sem);
     }
 }
-
-//要改
-/* void *data_analys()
-{
-    printf("Ana 线程已创建!\n");
-
-    int mark = 0;
-    int ret_len;
-
-    channel[0] = channel[1] = -1; //channel不相同，不变，相同，转存另一个
-
-    bit_head_read(pack_rec, 'b');
-    cpy_count = 1;
-
-    channel[1] = (int)bit_head_read(pack_rec + cpy_count, 'c');
-
-    while (work != -1)
-    {
-        sem_wait(&int_sem_rxb);
-        while (cpy_count < PACK_SIZE)
-        {
-            //when adc length=0
-            if ((ret_len = bit_head_read(pack_rec + cpy_count, 'l')) == 0) 
-            {
-                break;
-            }
-            //show adc frame head info
-            if (work == 1)
-            {
-                bit_head_read(pack_rec + cpy_count, 'f');
-            }
-            if(channel[0] = bit_head_read(pack_rec + cpy_count, 'c') == channel[1]){
-                mark = 1;
-            }
-            //ana operation
-
-            cpy_count += bit_head_read(pack_rec + cpy_count, 'l');
-            mark = 0;
-        }
-        memset(pack_rec, '0', PACK_SIZE);
-        sem_post(&int_sem_rxa);
-        cpy_count = 0;
-    }
-    return NULL;
-} */
 
 int main()
 {
@@ -184,11 +190,18 @@ int main()
     sem_init(sem, 0, 1);
     sem_init(sem + 1, 0, 0);
 
+    error_log = fopen("error_log", "w+");
+    if (error_log == NULL)
+    {
+        printf("Error log file open failed!\n");
+        exit(1);
+    }
+
     pthread_t recv_ptd, ana_ptd;
     ptd_create(&recv_ptd, 0, (void *(*))pack_recv);
     ptd_create(&ana_ptd, 0, (void *(*))data_analys_ls);
 
-    while (sig != '0')
+    while (sig != 'o')
     {
         sig = getchar();
         switch (sig)
@@ -201,7 +214,10 @@ int main()
             break;
         }
     }
+
     work = -1;
+    fclose(save);
+    fclose(error_log);
     close(connect_fd);
     close(socket_fd);
     return 0;
