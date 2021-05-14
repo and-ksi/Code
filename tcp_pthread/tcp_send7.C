@@ -9,7 +9,7 @@ void *control_base;
 int interrupt_fd;
 int read_end_addr;
 
-unsigned int pData[2][RX_SIZE / 8]; //25M / 4 * 32 bit     count
+unsigned int pData[2][RX_SIZE / 4]; //25M / 4 * 32 bit     count
                                     //10M / 4 * 4 MB       size
 
 static sem_t sem[4];
@@ -83,7 +83,7 @@ void dev_open_fun()
 
     printf("c2h0 device Memory map successful!\n");
 
-    c2h_fd[1] = open(DEVICE_NAME_C2H_1, O_RDONLY | O_NONBLOCK); //打开pcie c2h_1设备
+/*     c2h_fd[1] = open(DEVICE_NAME_C2H_1, O_RDONLY | O_NONBLOCK); //打开pcie c2h_1设备
     if (c2h_fd[1] == -1)
     {
         printf("PCIe c2h_1 device open failed!\n");
@@ -93,7 +93,7 @@ void dev_open_fun()
 
     mmap(0, MAP_SIZE, PROT_READ, MAP_SHARED, c2h_fd[1], 0);
 
-    printf("c2h[1] device Memory map successful!\n");
+    printf("c2h[1] device Memory map successful!\n"); */
 
     h2c_fd = open(DEVICE_NAME_H2C_0, O_WRONLY | O_NONBLOCK); //打开pcie  h2c设备
     if (h2c_fd == -1)
@@ -191,10 +191,11 @@ void part_operation(unsigned int *ddata, int si){
     while (cpy_count < si){
         for (int i = 0; i < 1030; i++)//检测board_head位置
         {
-            if (*(ddata + cpy_count + i) == 0 && *(ddata + cpy_count + i + 1) != 0)
+            if (*(ddata + cpy_count + i) == 0x66666666
+             && *(ddata + cpy_count + i + 1) != 0x66666666)
             {
-                printf("Get correct head!   %d\n", i);
-                cpy_count += i;//conduct 0x040000ff and board_head
+                //printf("Get correct head!   %d\n", i);
+                cpy_count += i;
                 break;
             }else if (i > 1025)
             {
@@ -216,7 +217,7 @@ void part_operation(unsigned int *ddata, int si){
             if (_length == 0 || _length < 3)
             {
                 printf("Data read error!\n");
-                break;
+                exit(1);
             }
             _channel = bit_head_read(ddata + cpy_count, 'c');
             if(_channel == 0 || _channel == 4){
@@ -227,9 +228,9 @@ void part_operation(unsigned int *ddata, int si){
             swich_client = cci(_channel);
             memcpy(pack_send[swich_client] + past_count[swich_client],
                    ddata + cpy_count, _length + 3);
-            past_count[swich_client] += _length + 3; //length 包括数据数量以及头
+            past_count[swich_client] += _length + 3; //length 包括数据数量 3包括adchead
             cpy_count += _length + 3;
-            while(*(ddata + cpy_count) == 0)//确定是否读到board最后
+            while(*(ddata + cpy_count) == 0x66666666)//确定是否读到board最后
             {
                 cpy_count++;
             }
@@ -254,8 +255,8 @@ void *data_part(){
         sem_wait(&sem[2]);
         sem_wait(&sem[2]);
         sem_wait(&sem[2]);
-        part_operation(pData[0], sizeof(pData[0]) / 8);
-        part_operation(pData[1], sizeof(pData[1]) / 8);
+        part_operation(pData[0], sizeof(pData[0]) / 4);
+        //part_operation(pData[1], sizeof(pData[1]) / 8);
         sem_post(&sem[3]);
         sem_post(&sem[3]);
         sem_post(&sem[3]);
@@ -264,7 +265,7 @@ void *data_part(){
 }
 
 int main(){
-    sem_init(sem , 0, 2);
+    sem_init(sem + 0, 0, 2);
     sem_init(sem + 1, 0, 0);
     sem_init(sem + 2, 0, 1);
     sem_init(sem + 3, 0, 2);//注意让两个read先使用这个信号,否则出bug
@@ -283,9 +284,10 @@ int main(){
     work = 1;
     time_count[0] = time_count[1] = 0;
 
-    for(int i = 0; i < 2; i++){
+/*     for(int i = 0; i < 2; i++){
         pthread_create(rx_thread + i, 0, (void *(*)(void *))rx_thread, &i);
-    }
+    } */
+    pthread_create(rx_thread, 0, (void *(*)(void *))rx_thread, 0);
     pthread_create(&event_thread, NULL, (void *(*)(void *))event_process, NULL);
     ptd_create(&part_ptd, CPU_CORE - 2, (void *)data_part);
     ptd_create(&send_ptd, CPU_CORE - 1, (void *)data_send_func);
@@ -350,7 +352,7 @@ int main(){
     work = 0;
 
     close(c2h_fd[0]);
-    close(c2h_fd[1]);
+    //close(c2h_fd[1]);
     close(h2c_fd);
     close(control_fd);
     close(interrupt_fd);

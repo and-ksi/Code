@@ -20,8 +20,8 @@ int time_count;
 FILE *error_log, *save;
 
 unsigned int pack_rec[PACK_SIZE];
-long long timestamp[PACK_SIZE / 20];
-int channel[2];
+long long timestamp[PACK_SIZE / 40];
+int channel;
 
 //socket create functon, need global identifier:
 //socket_fd IP port connect_fd
@@ -92,14 +92,13 @@ int difference_func(long long t_stamp){
         if (abs(diffrence1) < abs(diffrence))
         {
             diffrence = diffrence1;
-            min++;
         }
     }
     if(m == 4){
         time_count += 4;
         difference_func(t_stamp);
     }else if(diffrence <= DELAY_MAX){
-        time_count += min;
+        time_count += m - 1;
         return 1;//指其为有效数据
     }else{
         return 0;//为需要舍弃的数据
@@ -129,25 +128,27 @@ void *data_analys_ls(){
         {
             for (int i = 0; i < 1030; i++)
             {
-                if (pack_rec[i + cpy_count] == 0 && pack_rec[i + cpy_count + 1] != 0)
+                if (pack_rec[i + cpy_count] == 0xffffffff)
                 {
-                    printf("Get correct head!   %d\n", i);
+                    //printf("Get correct head!   %d\n", i);
                     cpy_count += i;
                     break;
                 }
                 else if (i > 1025)
                 {
-                    printf("Read head error!\n");
-                    for(int e = -50; e < 50; e++){
+                    printf("Read head error!    cpy_count: %d\n", cpy_count);
+                    for(int e = -20; e < 50; e++){
                         fprintf(error_log, "%d:   %x\n", e, pack_rec[cpy_count + e]);
                     }
                     fclose(error_log);
                 }
             }
-            bit_head_read(pack_rec + cpy_count, 'b');
+            //bit_head_read(pack_rec + cpy_count, 'b');
             cpy_count++;
 
-            while(pack_rec[cpy_count] != 0){
+            while(pack_rec[cpy_count] != 0xffffffff 
+            && pack_rec[cpy_count] != 0){
+                //difference_func返回1,保存数据,反之直接跳过该数据
                 if(difference_func(bit_time_read(pack_rec + cpy_count))){
                     _length = bit_head_read(pack_rec + cpy_count, 'l');
                     fwrite(pack_rec + cpy_count, 4, _length + 3, save);
@@ -181,8 +182,11 @@ void *data_analys_ls(){
     }
 }
 
-int main()
+int main(int argc, char const *argv[])
 {
+    if(argc > 0){
+        port = atoi(argv[1]);
+    }
     char sig;
 
     work = 0;
@@ -198,7 +202,7 @@ int main()
     }
 
     pthread_t recv_ptd, ana_ptd;
-    ptd_create(&recv_ptd, 0, (void *(*))pack_recv);
+    ptd_create(&recv_ptd, 4, (void *(*))pack_recv);
     ptd_create(&ana_ptd, 0, (void *(*))data_analys_ls);
 
     while (sig != 'o')
