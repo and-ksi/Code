@@ -111,11 +111,33 @@ void *funCustomer(void *arg)
 } */
 
 //十六进制数的读取和输出
-#include <stdio.h>
+/* #include <stdio.h>
 
 int main(){
     unsigned int test[10] = {0};
     scanf("%x", test);
     printf("%d", *test);
     return 0;
+} */
+
+//通过管线控制gnuplot绘图
+#include <stdio.h>
+int main()
+{
+    FILE *gp;
+#ifdef WIN32 gp = _popen("gnuplot -persist", "w");
+#else gp = popen("gnuplot -persist", "w");
+#endif if (gp == NULL) return -1;
+    fprintf(gp, "set isosample 100/n");
+    fprintf(gp, "min=-1/n");
+    fprintf(gp, "max=1/n");
+    fprintf(gp, "pi=3.141592/n");
+    fprintf(gp, "set hidden3d/n");
+    fprintf(gp, "set pm3d/n");
+    fprintf(gp, "set contour/n");
+    fprintf(gp, "splot [min:max] [min:max] x*x+2*y*y-0.3*cos(3*pi*x)-0.4*cos(4*pi*y)+0.7/n");
+    fprintf(gp, "pause -1/n");
+#ifdef WIN32 _pclose(gp);
+#else pclose(gp);
+#endif return 0;
 }
