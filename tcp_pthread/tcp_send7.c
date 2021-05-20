@@ -30,13 +30,14 @@ int time_count[2];
 int past_count[CHANNEL_NUM] = {0};//pasted_count
 int cpy_count;
 
+FILE *error_fp;
+
 /*中断处理进程*/
 void *event_process()
 {
     interrupt_fd = open_event("/dev/xdma0_events_0"); //打开用户中断
     while (work == 1)
     {
-        sem_wait(&sem[0]);
         sem_wait(&sem[0]);
         //printf("Start read interrupt !\n");
         read_event(interrupt_fd);                           //获取用户中断
@@ -45,7 +46,6 @@ void *event_process()
         
 
         sem_post(&sem[1]); //release signal
-        sem_post(&sem[1]);
     }
     pthread_exit(0);
 }
@@ -54,12 +54,15 @@ void *rx_process(int id)
 {
     while (work == 1)
     {
-        sem_wait(&sem[4]);
+
         sem_wait(&sem[1]);
         //printf("read_end_addr = %x \n", read_end_addr);
         lseek(c2h_fd[id], (read_end_addr - (50 - id * 25) * 1024 * 1024), SEEK_SET);
         read(c2h_fd[id], pData[id], sizeof(pData[id])); //10MB
-        sem_post(&sem[0]);
+        /* fwrite(pData[0], 4, RX_SIZE / 4, error_fp);
+        fclose(error_fp);
+        exit(1); */
+
         sem_post(&sem[2]);
     }
     pthread_exit(0);
@@ -128,6 +131,7 @@ void *data_send_func(int *count__){
                     {
                         printf("第%d次发送 : 对%d客户端 : Send failed!\n", *count__, i);
                     }
+                    printf("第%d次发送 : 对%d客户端 : Send success!\n", *count__, i);
                 }
             }
 
@@ -136,6 +140,7 @@ void *data_send_func(int *count__){
             {
                 printf("第%d次发送 : 对%d客户端 : Send timestamp failed!\n", *count__, i);
             }
+            printf("第%d次发送 : 对%d客户端 : Send timestamp success!\n", *count__, i);
         }
         *count__++;
         memset(past_count, 0, sizeof(past_count));
@@ -185,7 +190,7 @@ void socket_create()
 
     for (i = 0; i < CLIENT_NUM; i++)
     {
-        printf("等待客户端连接...\n");
+        printf("等待第%d个客户端连接... %d/%d\n", i, i + 1, CLIENT_NUM);
         acfd[i] = accept(socket_fd, (struct sockaddr *)&clientaddr[i], &len);
         if (acfd[i] < 0)
         {
@@ -218,11 +223,12 @@ void part_operation(unsigned int *ddata, int si)
                 exit(1);
             }
         } */
+        
         for (int i = 0; i < 2000; i++) //检测board_head位置
         {
             if (*(ddata + cpy_count + i) == 0x0000f00f)
             {
-                printf("Get correct head!   %d\n", i);
+                //printf("Get correct head!   %d\n", i);
                 cpy_count += i; //conduct 0x040000ff and board_head
                 break;
             }
@@ -246,31 +252,48 @@ void part_operation(unsigned int *ddata, int si)
             _length = bit_head_read(ddata + cpy_count, 'l');
             if (_length == 0 || _length < 3)
             {
-                printf("Data read error!\n");
+                printf("Data read error! %d\n", _length);
+                write_error_log(error_fp, ddata + cpy_count);
                 exit(1);
             }
+            if(_length > 1000){
+                write_error_log(error_fp, ddata + cpy_count);
+                printf("error! %d\n", _length);
+            }
+            //printf("_length: %d\n", _length);
             _channel = bit_head_read(ddata + cpy_count, 'c');
             /* if(_channel == 0 || _channel == 4){
                 timestamp[_channel / 4][time_count[_channel / 4]] = 
                  bit_time_read(ddata + cpy_count);
                 time_count[_channel / 4]++;
             } */
-
+            
             memcpy(pack_send[_channel] + past_count[_channel], ddata + cpy_count, _length + 1);
             past_count[_channel] += _length + 1; //length 包括数据数量 3包括adchead
             cpy_count += _length + 1;
+            
+            while(*(ddata + cpy_count) == *(ddata + cpy_count - 1)){
+                cpy_count++;
+            }
             while (*(ddata + cpy_count) == 0x66666666 || *(ddata + cpy_count) == 0x7000f000) //确定是否读到board最后
             {
                 cpy_count++;
             }
         }
+        
+        printf("board info end!\n");
         //如果不需要添加board之间区别,以下去掉
         for (int i = 0; i < CHANNEL_NUM; i++) //接收端分析数据时读到8f结束当前board
         {
             *(pack_send[i] + past_count[i]) = 0xffffffff;
             past_count[i]++;
         }
+        if(ddata + cpy_count == 0 && ddata + cpy_count + 1 == 0){
+            break;
+        }
     }
+    printf("debug!!!!!!!!!!!!!!\n");
+
     cpy_count = 0;
 }
 
@@ -283,21 +306,22 @@ void *data_part(){
     while(work == 1){
         sem_wait(&sem[2]);
         sem_wait(&sem[2]);
-        sem_wait(&sem[2]);
+
         part_operation(pData[0], sizeof(pData[0]) / 4);
         //part_operation(pData[1], sizeof(pData[1]) / 8);
-        sem_post(&sem[3]);
-        sem_post(&sem[3]);
+        printf("part finished!\n");
+        sem_post(&sem[0]);
+
         sem_post(&sem[3]);
     }
     return NULL;
 }
 
 int main(){
-    sem_init(sem + 0, 0, 2);
+    sem_init(sem + 0, 0, 1);
     sem_init(sem + 1, 0, 0);
     sem_init(sem + 2, 0, 1);
-    sem_init(sem + 3, 0, 2);//注意让两个read先使用这个信号,否则出bug
+    sem_init(sem + 3, 0, 0);//注意让两个read先使用这个信号,否则出bug
 
     char sig;
 
@@ -308,6 +332,8 @@ int main(){
     pthread_t event_thread, rx_thread[2];
     pthread_t part_ptd, send_ptd;
 
+    error_fp = (FILE *)open_error_log();
+
     dev_open_fun();
     socket_create();
     work = 1;
@@ -316,10 +342,13 @@ int main(){
 /*     for(int i = 0; i < 2; i++){
         pthread_create(rx_thread + i, 0, (void *(*)(void *))rx_thread, &i);
     } */
-    pthread_create(rx_thread, 0, (void *(*)(void *))rx_thread, 0);
+    
+    pthread_create(rx_thread, 0, (void *(*)(void *))rx_process, 0);
     pthread_create(&event_thread, NULL, (void *(*)(void *))event_process, NULL);
+    
     ptd_create(&part_ptd, CPU_CORE - 2, (void *)data_part);
     ptd_create(&send_ptd, CPU_CORE - 1, (void *)data_send_func);
+    
 
     while(sig != 'o'){
         sig = getchar();

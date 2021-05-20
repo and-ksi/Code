@@ -55,6 +55,7 @@ void get_recv_id(){
     char _buf[50] = {'\0'};
     recv(socket_fd, _buf, 50, 0);
     recv_id = atoi(_buf);
+    printf("本机id为: %d\n", recv_id);
 }
 
 //receive pthread
@@ -157,7 +158,7 @@ void *data_analys_ls(){
                         printf("Read head error!    cpy_count: %d\n", cpy_count);
                         for (int e = -20; e < 50; e++)
                         {
-                            fprintf(error_log, "%d:   %x\n", e, pack_rec[cpy_count + e]);
+                            fprintf(error_log, "%d:   %x\n", e, pack_rec[m][cpy_count + e]);
                         }
                         fclose(error_log);
                         exit(1);
@@ -209,7 +210,7 @@ void *data_analys_ls(){
 
 int main(int argc, char const *argv[])
 {
-    if(argc > 0){
+    if(argc > 1){
         port = atoi(argv[1]);
     }
     char sig;

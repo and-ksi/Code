@@ -245,7 +245,7 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0)
 
     case 'c':
         //return bit_read(in_, 8, 8);
-        return (*in_ & 0x000000ff) - 1;
+        return (*in_ & 0x000000ff) - 1 - 4;
         break;
 
     case 'e':
@@ -261,14 +261,9 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0)
     case 'l':
         if ((*in_ >> 16) < 5)
         {
-            for (int i = 1; i < 1024; i++)
+            for (int i = 5; i < 1024; i++)
             {
-                if ((*(in_ + i) & 0x00003f00) == 0x00003f00)
-                {
-                    return i - 1;
-                }
-                else if (*(in_ + i) == 0x7000f000 && *(in_ + i + 1) == 0x7000f000)
-                {
+                if (*(in_ + i) & 0x0fff0000 == 0 || *(in_ + i) & 0x00000fff == 0){
                     return i - 1;
                 }
             }
@@ -373,6 +368,19 @@ void *open_error_log()
         exit(1);
     }
     return error_log;
+}
+
+void write_error_log(FILE *_fp, unsigned int *edata){
+    FILE *error_fp = (FILE *)_fp;
+    for (int i = -50; i < 0; i++)
+    {
+        fprintf(error_fp, "%x\n", *(edata + i));
+    }
+    fprintf(error_fp, "\n");
+    for(int i = 0; i < 100; i++){
+        fprintf(error_fp, "%x\n", *(edata + i));
+    }
+    fclose(_fp);
 }
 
 #endif
