@@ -12,8 +12,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #define __USE_GNU
-#include <sched.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -38,26 +38,26 @@
 #define RX_SIZE (5 * 1024 * 1024) //1byte 8bit
 
 #define PACK_SIZE (RX_SIZE / 16)
-#define CHANNEL_NUM (8)
+#define CHANNEL_NUM (4)
 #define CPU_CORE (4) //CPU核心数量,使用顺序从数值最大的核心开始分配,留下第一个核心不分配
-#define CLIENT_NUM (7)
+#define CLIENT_NUM (3)
 
 typedef struct _board_head
 {
-    int board_type;//8
-    int board_addr;//8
-    int Ftype;//2
-    int Error;//14
+    int board_type; //8
+    int board_addr; //8
+    int Ftype;      //2
+    int Error;      //14
 } BOARD_HEAD;
 typedef struct _frame_head
 {
-    int channel_id;//8
-    int error;//6
-    int Ftype;//2
-    int length;//16
+    int channel_id; //8
+    int error;      //6
+    int Ftype;      //2
+    int length;     //16
     //char timestamp_H[32];
     //char timestamp_L[32];
-    long long timestamp;//64
+    long long timestamp; //64
 } FRAME_HEAD;
 
 //根据CPU创建和分配线程
@@ -198,9 +198,11 @@ static uint32_t read_control(void *base_addr, int offset)
     return read_result;
 }
 
-unsigned int bit_read(unsigned *in_, int lo, int si){
+unsigned int bit_read(unsigned *in_, int lo, int si)
+{
     unsigned int ret = 0;
-    for(int i = si ; i > 0; i--){
+    for (int i = si; i > 0; i--)
+    {
         ret = ret | (((*in_ >> (lo - i)) & 1) << i - 1);
     }
     return ret;
@@ -208,14 +210,16 @@ unsigned int bit_read(unsigned *in_, int lo, int si){
 
 long long bit_time_read(unsigned int *in_)
 {
-    long long ret = 0;
-    //ret = ret | (((long long)bit_read(in_ + 1, 32, 32)) << 32);
-    ret = *(in_ + 1);
-    return (*(in_ + 2) | (ret << 32));
+    long long ret = *(in_ + 1);
+    return ((ret << 32) | *(in_ + 2));
+    /* ret = *(in_ + 1);
+    return (*(in_ + 2) | (ret << 32)); */
 }
 
-unsigned int bit_head_read(unsigned int *in_, char sig_0){
-    if(in_ == NULL){
+unsigned int bit_head_read(unsigned int *in_, char sig_0)
+{
+    if (in_ == NULL)
+    {
         printf("Bit read error!\n");
         return 0;
     }
@@ -223,54 +227,73 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0){
     int i;
     switch (sig_0)
     {
-    case 'T'://Board_type
+    case 'T': //Board_type
         return bit_read(in_, 8, 8);
         break;
 
-    case 'A'://Board_address
+    case 'A': //Board_address
         return bit_read(in_, 8, 8);
         break;
 
-    case 'Y'://Board_ftype
+    case 'Y': //Board_ftype
         return bit_read(in_, 8, 8);
         break;
 
-    case 'E'://Board_error
+    case 'E': //Board_error
         return bit_read(in_, 8, 8);
         break;
 
     case 'c':
-        return bit_read(in_, 8, 8);
+        //return bit_read(in_, 8, 8);
+        return (*in_ & 0x000000ff) - 1;
         break;
 
     case 'e':
-        return bit_read(in_, 14, 6);
+        //return bit_read(in_, 14, 6);
+        return ((*in_ << 18) >> 26);
         break;
 
     case 'F':
-        return bit_read(in_, 16, 2);
+        //return bit_read(in_, 16, 2);
+        return (*in_ << 16) >> 30;
         break;
 
     case 'l':
-        return (*in_ >> 16);
+        if ((*in_ >> 16) < 5)
+        {
+            for (int i = 1; i < 1024; i++)
+            {
+                if ((*(in_ + i) & 0x00003f00) == 0x00003f00)
+                {
+                    return i - 1;
+                }
+                else if (*(in_ + i) == 0x7000f000 && *(in_ + i + 1) == 0x7000f000)
+                {
+                    return i - 1;
+                }
+            }
+        }
+        else
+        {
+            return (*in_ >> 16);
+        }
         break;
 
     case 'b':
         printf("**********BOARD INFO**********\n");
         printf("Board type:%x \nBoard addr:%x\nBoard Ftype:%x\nBoard Error:%x\n\n",
-         bit_read(in_, 32, 8), bit_read(in_, 24, 8), 
-         bit_read(in_, 16, 2), bit_read(in_, 14, 14));
+               bit_read(in_, 32, 8), bit_read(in_, 24, 8),
+               bit_read(in_, 16, 2), bit_read(in_, 14, 14));
         return 0;
         break;
 
     case 'f':
         printf("**********FRAME INFO**********\n");
-        printf("channel_id: %x\nError: %x\nFtype: %x\nLength: %d\nTimestamp: %llx\n\n",
+        printf("channel_id: %02x\nError: %02x\nFtype: %x\nLength: %04d\nTimestamp: %llx\n\n",
                bit_head_read(in_, 'c'), bit_head_read(in_, 'e'),
-                bit_head_read(in_, 'F'), bit_head_read(in_, 'l'), bit_time_read(in_));
+               bit_head_read(in_, 'F'), bit_head_read(in_, 'l'), bit_time_read(in_));
         return 0;
         break;
-        
 
     default:
         printf("sig_0 error!\n");
@@ -288,12 +311,14 @@ int bit_data_read(unsigned int *in_, char sig_1, int d)
         return 0;
     }
     int ret;
-    if(d == 0){
+    if (d == 0)
+    {
         switch (sig_1)
         {
         case 'd':
-            //return bit_read(in_, 28, 12);//这是反向读取数据
-            return *in_ & 0x0fff0000;
+            //return bit_read(in_, 32, 12);//这是反向读取数据
+            return ((*in_ & 0x0fff0000) >> 16);
+
             break;
 
         case 'c':
@@ -305,11 +330,13 @@ int bit_data_read(unsigned int *in_, char sig_1, int d)
             return 0;
             break;
         }
-    }else{
+    }
+    else
+    {
         switch (sig_1)
         {
         case 'd':
-            //return bit_read(in_, 14, 12);
+            //return bit_read(in_, 16, 12);
             return *in_ & 0x00000fff;
             break;
 
@@ -334,12 +361,14 @@ double bit_float_read(unsigned int *in_, int d)
     }
     int ret;
     ret = bit_data_read(in_, 'd', d);
-    return (-5. + (double)ret * (10. / (double)(ldexp(1, 12) - 1)));
+    return (5. - (double)ret * (10. / (double)(ldexp(1, 12) - 1)));
 }
 
-void *open_error_log(){
+void *open_error_log()
+{
     FILE *error_log = fopen("error_log", "w+");
-    if(error_log == NULL){
+    if (error_log == NULL)
+    {
         printf("Error log file open failed!\n");
         exit(1);
     }

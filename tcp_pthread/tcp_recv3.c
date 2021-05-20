@@ -4,10 +4,12 @@
 static sem_t sem[2];
 
 //about socket
-char IP[] = "192.168.3.1";
+char IP[] = "192.168.3.4";
 int port = 10000;
 int socket_fd;
 int connect_fd;
+int recv_id;
+int recv_num = 1;
 
 int work;
 
@@ -19,7 +21,7 @@ int time_count;
 
 FILE *error_log, *save;
 
-unsigned int pack_rec[PACK_SIZE];
+unsigned int pack_rec[2][PACK_SIZE];
 long long timestamp[PACK_SIZE / 40];
 int channel;
 
@@ -49,6 +51,12 @@ void socket_create()
     }
 }
 
+void get_recv_id(){
+    char _buf[50] = {'\0'};
+    recv(socket_fd, _buf, 50, 0);
+    recv_id = atoi(_buf);
+}
+
 //receive pthread
 void *pack_recv()
 {
@@ -56,18 +64,27 @@ void *pack_recv()
 
     int ret;
     recv_count = 0;
-    socket_create();
+
+    for(int i = 0; i < CHANNEL_NUM; i++){
+        ret = i % CLIENT_NUM;
+        if(ret == recv_id){
+            printf("接收%dCHANNEL_DATA!\n", i);
+            recv_num++;
+        }
+    }
 
     memset(pack_rec, 0, sizeof(pack_rec));
 
     while (work != -1)
     {
         sem_wait(sem);
-        ret = recv(socket_fd, pack_rec, sizeof(pack_rec), 0);
-        if (ret < 0)
-        {
-            printf("Recv fail! recv_count: %d \n", recv_count);
-            exit(1);
+        for(int i = 0; i < recv_num; i++){
+            ret = recv(socket_fd, pack_rec[i], sizeof(pack_rec[i]), 0);
+            if (ret < 0)
+            {
+                printf("Recv fail! recv_count: %d \n", recv_count);
+                exit(1);
+            }
         }
         ret = recv(socket_fd, timestamp, sizeof(timestamp), 0);
         if (ret < 0)
@@ -124,59 +141,67 @@ void *data_analys_ls(){
     while (work != -1)
     {
         sem_wait(sem + 1);
-        while (cpy_count < PACK_SIZE)
-        {
-            for (int i = 0; i < 1030; i++)
+        for(int m = 0; m < recv_num; m++){
+            while (cpy_count < PACK_SIZE)
             {
-                if (pack_rec[i + cpy_count] == 0xffffffff)
+                for (int i = 0; i < 1030; i++)
                 {
-                    //printf("Get correct head!   %d\n", i);
-                    cpy_count += i;
-                    break;
-                }
-                else if (i > 1025)
-                {
-                    printf("Read head error!    cpy_count: %d\n", cpy_count);
-                    for(int e = -20; e < 50; e++){
-                        fprintf(error_log, "%d:   %x\n", e, pack_rec[cpy_count + e]);
+                    if (pack_rec[m][i + cpy_count] == 0xffffffff)
+                    {
+                        //printf("Get correct head!   %d\n", i);
+                        cpy_count += i;
+                        break;
                     }
-                    fclose(error_log);
+                    else if (i > 1025)
+                    {
+                        printf("Read head error!    cpy_count: %d\n", cpy_count);
+                        for (int e = -20; e < 50; e++)
+                        {
+                            fprintf(error_log, "%d:   %x\n", e, pack_rec[cpy_count + e]);
+                        }
+                        fclose(error_log);
+                        exit(1);
+                    }
                 }
-            }
-            //bit_head_read(pack_rec + cpy_count, 'b');
-            cpy_count++;
+                //bit_head_read(pack_rec + cpy_count, 'b');
+                cpy_count++;
 
-            while(pack_rec[cpy_count] != 0xffffffff 
-            && pack_rec[cpy_count] != 0){
-                //difference_func返回1,保存数据,反之直接跳过该数据
-                if(difference_func(bit_time_read(pack_rec + cpy_count))){
-                    _length = bit_head_read(pack_rec + cpy_count, 'l');
-                    fwrite(pack_rec + cpy_count, 4, _length + 3, save);
-                    cpy_count += _length + 3;
-                }else{
-                    _length = bit_head_read(pack_rec + cpy_count, 'l');
-                    cpy_count += _length + 3;
+                while (pack_rec[m][cpy_count] != 0xffffffff && pack_rec[m][cpy_count] != 0)
+                {
+                    //difference_func返回1,保存数据,反之直接跳过该数据
+                    if (difference_func(bit_time_read(pack_rec[m] + cpy_count)))
+                    {
+                        _length = bit_head_read(pack_rec[m] + cpy_count, 'l');
+                        fwrite(pack_rec[m] + cpy_count, 4, _length + 3, save);
+                        cpy_count += _length + 3;
+                    }
+                    else
+                    {
+                        _length = bit_head_read(pack_rec[m] + cpy_count, 'l');
+                        cpy_count += _length + 3;
+                    }
                 }
-            }
 
-            if(pack_rec[1 + cpy_count] == 0){
-                cpy_count = PACK_SIZE;
-            }
+                if (pack_rec[m][1 + cpy_count] == 0)
+                {
+                    cpy_count = PACK_SIZE;
+                }
 
-            //bit_head_read(pack_rec + cpy_count, 'b');
-            //cpy_count++;
-            /* printf("仅显示前4个ADC_head info!\n");
+                //bit_head_read(pack_rec + cpy_count, 'b');
+                //cpy_count++;
+                /* printf("仅显示前4个ADC_head info!\n");
             for(int i = 0; i < 4; i++){
                 bit_head_read(pack_rec + cpy_count, 'f');
                 _length = bit_head_read(pack_rec + cpy_count, 'l');
                 cpy_count += _length;
             } */
-            /* while(*(pack_rec + cpy_count) != 0xffffffff){
+                /* while(*(pack_rec + cpy_count) != 0xffffffff){
                 _length = bit_head_read(pack_rec + cpy_count, 'l');
                 cpy_count += _length;
             } */
-
+            }
         }
+        
         memset(pack_rec, 0, sizeof(pack_rec));
         sem_post(sem);
     }
@@ -200,6 +225,9 @@ int main(int argc, char const *argv[])
         printf("Error log file open failed!\n");
         exit(1);
     }
+
+    socket_create();
+    get_recv_id();
 
     pthread_t recv_ptd, ana_ptd;
     ptd_create(&recv_ptd, 4, (void *(*))pack_recv);
