@@ -9,6 +9,7 @@ int port = 10000;
 int work;
 static sem_t sem[4];
 struct sockaddr_in clientaddr[10] = {0};
+FILE *error_fp; //错误报告
 
 //PCIE读取 变量
 int c2h_fd[2];
@@ -24,8 +25,6 @@ int acfd[8];
 
 //统计变量
 int socket_count;
-
-FILE *error_fp;//错误报告
 
 /*中断处理进程*/
 void *event_process()
@@ -149,15 +148,17 @@ void socket_create()
         sprintf(buf, "%d", i);
         ret = send(*(acfd + i), buf, sizeof(buf), 0);
         if(ret < 0){
-            sprintf(error_fp, buf);
-            perror("Send failed!");
+            fprintf(error_fp, "\nSend recv_id failed: buf[%s]\n", buf);
+            perror("Send recv_id failed!\n");
+            fclose(error_fp);
             exit(1);
         }
         memset(buf, '\0', sizeof(buf));
         recv(*(acfd + i), buf, 10, 0);
         if(strcmp(buf, "ok") != 0){
-            printf("Connectde error!\n");
-            sprintf(error_fp, buf);
+            printf("Recv OK error!\n");
+            fprintf(error_fp, "\nRecv ok failed : buf[%s]\n", buf);
+            fclose(error_fp);
             exit(1);
         }
         printf("第%d个客户端已连接!\n", i + 1); //希望能够显示连接的客户端地址
@@ -169,6 +170,7 @@ void *data_part_send(){
     int location;
     int board_location[1024];
     int board_num;
+    int mark_send[2];
 
     socket_count = 0;
 
@@ -178,7 +180,7 @@ void *data_part_send(){
         board_location[0] = find_board_head(pData, 0);
         for(board_num = 1; board_num < 1024; board_num++){
             location = find_board_head(pData + board_location[board_num - 1] + 1024, 1);
-            if(location == 10){
+            if(location == 100){
                 board_num--;
                 break;
             }
@@ -191,24 +193,35 @@ void *data_part_send(){
              4 * (board_location[i * location + 1] - board_location[(i - 1) * location]), 0);
             if(ret < 0){
                 printf("Data send failed! socket_count: %d\n", socket_count);
-                fprintf(error_fp, "Data send failed! socket_count: %d\n", socket_count);
+                fprintf(error_fp, "\nData send failed! socket_count: %d\n", socket_count);
+                exit(1);
+            }
+            mark_send[0] = board_num / client_num + 1;
+            mark_send[1] = 4 * (board_location[i * location + 1] - board_location[(i - 1) * location]);
+            ret = send(acfd[i], mark_send, sizeof(mark_send), 0);
+            if(ret < 0){
+                printf("Mark_send send failed! : %d, %d\n", mark_send[0], mark_send[1]);
+                fprintf(error_fp, "\nMark_send send failed! : %d, %d\n", mark_send[0], mark_send[1]);
                 exit(1);
             }
         }
-        socket_count++;
+        memset(pData, 0, sizeof(pData));
         sem_post(sem + 0);
+        socket_count++;
+        memset(mark_send, 0, sizeof(mark_send));
     }
 }
 
 int main(int argc, char const *argv[]){
     char sig;
     while(sig != 'y'){
-        printf("Port = %d\nClient_num = %d\nChannel_num = %d\nPress'y'and enter to continue...", port, client_num, channel_num);
+        printf("Port = %d\nClient_num = %d\nChannel_num = %d\nPress'y' to continue...\n", port, client_num, channel_num);
         if(sig != 'y'){
             printf("port, client_num, channel_num\n");
             scanf("%d%d%d", &port, &client_num, &channel_num);
         }
     }
+    fprintf(error_fp, "\nPort = %d\nClient_num = %d\nChannel_num = %d\n", port, client_num, channel_num);
 
     unsigned int pos = 0;
     unsigned int cnontrol_3;
