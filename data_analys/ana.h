@@ -364,7 +364,7 @@ void *open_error_log()
     struct tm *lt;
     time(&t);           //获取Unix时间戳。
     lt = localtime(&t); //转为时间结构。
-    sprintf(buf, "log/error_%d:%d_%d:%d:%d.log", lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
+    sprintf(buf, "log/error_%d-%d_%d-%d-%d.log", lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
 
     FILE *error_log = fopen(buf, "w+");
     if (error_log == NULL)
@@ -375,22 +375,22 @@ void *open_error_log()
     return error_log;
 }
 
-void write_error_log(FILE *_fp, unsigned int *edata, int m_mark)
+void write_error_log(FILE **_fp, unsigned int *edata, int m_mark)
 {
-    FILE *error_fp = (FILE *)_fp;
+    FILE **error_fp = (FILE **)_fp;
     if(!m_mark){
         for (int i = -50; i < 0; i++)
         {
-            fprintf(error_fp, "%x\n", *(edata + i));
+            fprintf(*error_fp, "%x\n", *(edata + i));
         }
     }
     
-    fprintf(error_fp, "\n");
+    fprintf(*error_fp, "\n");
     for (int i = 0; i < 100; i++)
     {
-        fprintf(error_fp, "%x\n", *(edata + i));
+        fprintf(*error_fp, "%x\n", *(edata + i));
     }
-    fclose(_fp);
+    //fclose(_fp);
 }
 
 void *open_savelog(int num){
@@ -406,7 +406,7 @@ void *open_savelog(int num){
     struct tm *lt;
     time(&t);           //获取Unix时间戳。
     lt = localtime(&t); //转为时间结构。
-    sprintf(buf, "datalog/savelog_%d:%d_%d:%d:%d.log", lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
+    sprintf(buf, "datalog/savelog_%d-%d_%d-%d-%d.log", lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
     log_save = fopen(buf, "w+");
     if (log_save == NULL)
     {

@@ -187,6 +187,7 @@ void *data_part_send(){
         printf("debug: start part and send data\n");
         //board_location[0] = find_board_head(pData, 0);
         for(board_num = 0; board_num < 1024; board_num++){
+            printf("debug: 0here's no bug !\n");
             location = find_board_head(pData + board_location[board_num], 0);
             if(location == 100){
                 board_location[board_num] = 0;
@@ -194,8 +195,9 @@ void *data_part_send(){
                 break;
             }
             board_location[board_num] +=  location;
-            write_error_log(error_fp, pData + board_location[board_num], 1);
+            write_error_log(&error_fp, pData + board_location[board_num], 1);
             board_location[board_num + 1] = board_location[board_num] + 1024;
+            printf("debug: 1here's no bug !\n");
         }
         location = board_num / client_num + 1;
         exit(1);
