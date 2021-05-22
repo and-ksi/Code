@@ -104,7 +104,7 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
     } */
 
     pthread_create(arg, &attr, functionbody, NULL);
-    //printf("Id为%d的线程已创建完毕。", *arg);
+    //printf("debug: %d的线程已创建完毕。", k);
 
     pthread_attr_destroy(&attr); //销除线程属性
 }
@@ -220,7 +220,7 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0)
     int i;
     switch (sig_0)
     {
-    case 'T': //Board_type
+/*     case 'T': //Board_type
         return bit_read(in_, 8, 8);
         break;
 
@@ -234,7 +234,7 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0)
 
     case 'E': //Board_error
         return bit_read(in_, 8, 8);
-        break;
+        break; */
 
     case 'c':
 
@@ -268,13 +268,13 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0)
         }
         break;
 
-    case 'b':
+/*     case 'b':
         printf("**********BOARD INFO**********\n");
         printf("Board type:%x \nBoard addr:%x\nBoard Ftype:%x\nBoard Error:%x\n\n",
                bit_read(in_, 32, 8), bit_read(in_, 24, 8),
                bit_read(in_, 16, 2), bit_read(in_, 14, 14));
         return 0;
-        break;
+        break; */
 
     case 'f':
         printf("**********FRAME INFO**********\n");
@@ -355,7 +355,7 @@ double bit_float_read(unsigned int *in_, int d)
 
 void *open_error_log()
 {
-    if (NULL == opdir("log"))
+    if (NULL == opendir("log"))
     {
         mkdir("log", 0777);
     }
@@ -375,13 +375,16 @@ void *open_error_log()
     return error_log;
 }
 
-void write_error_log(FILE *_fp, unsigned int *edata)
+void write_error_log(FILE *_fp, unsigned int *edata, int m_mark)
 {
     FILE *error_fp = (FILE *)_fp;
-    for (int i = -50; i < 0; i++)
-    {
-        fprintf(error_fp, "%x\n", *(edata + i));
+    if(!m_mark){
+        for (int i = -50; i < 0; i++)
+        {
+            fprintf(error_fp, "%x\n", *(edata + i));
+        }
     }
+    
     fprintf(error_fp, "\n");
     for (int i = 0; i < 100; i++)
     {
@@ -391,10 +394,11 @@ void write_error_log(FILE *_fp, unsigned int *edata)
 }
 
 void *open_savelog(int num){
-    if (NULL == opdir("datalog"))
+    if (NULL == opendir("datalog"))
     {
         mkdir("datalog", 0777);
     }
+
     char buf[100];
     FILE *log_save;
 
@@ -403,13 +407,13 @@ void *open_savelog(int num){
     time(&t);           //获取Unix时间戳。
     lt = localtime(&t); //转为时间结构。
     sprintf(buf, "datalog/savelog_%d:%d_%d:%d:%d.log", lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
-    log_save = fopen(buf, 'w+');
+    log_save = fopen(buf, "w+");
     if (log_save == NULL)
     {
         printf("Log_save create failed!\n");
         exit(1);
     }
-    fwrite(num, 4, 1, log_save);
+    fwrite(&num, 4, 1, log_save);
     return log_save;
 }
 

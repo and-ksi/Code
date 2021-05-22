@@ -4,7 +4,7 @@
 int channel_num;
 int min_channel;
 int end_location;
-int board_num;
+int board_num = 1024;
 
 //功能控制
 int work;
@@ -85,24 +85,28 @@ void *recv_func(){
     int mark_recv[2];
     while(work != -1){
         sem_wait(sem + 0);
+        printf("debug: start wait for recving data\n");
         ret = recv(socket_fd, recved_pack, sizeof(recved_pack), 0);
         if(ret < 0){
             printf("Recv failed! recv_count: %d\n", recv_count);
-            fprintf("\nRecv failed! recv_count: %d\n", recv_count);
-            fprintf(error_fp, recved_pack);
+            fprintf(error_fp, "\nRecv failed! recv_count: %d\n", recv_count);
+            write_error_log(error_fp, recved_pack, 1);
             fclose(error_fp);
             exit(1);
         }
-        ret = recv(socket_fd, mark_recv, sizeof(mark_recv), 0);
+
+        //debug
+        /* ret = recv(socket_fd, mark_recv, sizeof(mark_recv), 0);
         if(ret < 0){
             printf("Recv mark_recv failed! : %d, %d\n", mark_recv[0], mark_recv[1]);
-            fprintf("\nRecv mark_recv failed! : %d, %d\n", mark_recv[0], mark_recv[1]);
+            fprintf(error_fp, "\nRecv mark_recv failed! : %d, %d\n", mark_recv[0], mark_recv[1]);
             exit(1);
         }
         board_num = mark_recv[0];
-        end_location = mark_recv[1];
+        end_location = mark_recv[1]; */
         recv_count++;
         sem_post(sem + 1);
+        printf("debug: recv data success: %d\n", recv_count);
     }
 }
 
@@ -110,14 +114,14 @@ int get_timestamp(long long *m_valid, LOCA_TIME *channel_0, int count_0, LOCA_TI
     //long long *m_valid = (long long *)malloc(sizeof(long long) * 1250);
     memset(m_valid, 0, sizeof(m_valid));
 
-    int valid_count = 0;
+    int valid_num = 0;
     int m = 0;
     int i = 0;
 
     for(; i < count_0;){
         if(abs((channel_0 + i)->m_timestamp - (channel_7 + m)->m_timestamp) < DELAY_MAX){
-            *(m_valid + valid_count) = channel_0->m_timestamp;
-            valid_count++;
+            *(m_valid + valid_num) = channel_0->m_timestamp;
+            valid_num++;
         }
         else if (((channel_0 + i)->m_timestamp - (channel_7 + m)->m_timestamp) > 0){
             m++;
@@ -127,17 +131,18 @@ int get_timestamp(long long *m_valid, LOCA_TIME *channel_0, int count_0, LOCA_TI
             continue;
         }
     }
-    return valid_count;
+    return valid_num;
 }
 
 void *example_analys(void *example_me){
     EXAMPLE_B *ex_me = (EXAMPLE_B *)example_me;
 
-    int adc_count[8] = 0;
-    int valid_count[8] = 0;
+    int adc_count[8] = {0};
+    int valid_count[8] = {0};
     int ret;
     unsigned int value;
     int _channel;
+    int valid_num;
     LOCA_TIME list_adc[8][1250];
     int loca;
     memset(list_adc, 0, sizeof(list_adc));
@@ -146,16 +151,16 @@ void *example_analys(void *example_me){
         loca = *(ex_me->start_address + i);
         for (; loca - *(ex_me->start_address + i) < 1024;)
         {
-            ret = find_adc_head(recved_pack[loca], 0);
+            ret = find_adc_head(recved_pack + loca, 0);
             if(ret == 100){
                 break;
             }
             loca += ret;
-            _channel = bit_head_read(recved_pack[loca], 'c');
+            _channel = bit_head_read(recved_pack + loca, 'c');
             (list_adc[_channel] + adc_count[_channel])->m_location  = loca;
             (list_adc[_channel] + adc_count[_channel])->m_channel   = _channel;
-            (list_adc[_channel] + adc_count[_channel])->m_length    = bit_head_read(recved_pack[loca], 'l');
-            (list_adc[_channel] + adc_count[_channel])->m_timestamp = bit_time_read(recved_pack[loca]);
+            (list_adc[_channel] + adc_count[_channel])->m_length    = bit_head_read(recved_pack + loca, 'l');
+            (list_adc[_channel] + adc_count[_channel])->m_timestamp = bit_time_read(recved_pack + loca);
             loca += (list_adc[_channel] + adc_count[_channel])->m_length;
             adc_count[_channel]++;
         }
@@ -163,16 +168,16 @@ void *example_analys(void *example_me){
     if(ex_me->m_mark < 2){
         loca = *(ex_me->start_address + ex_me->m_board_num);
         for(int k = 0; k < 16; k++){
-            ret = find_adc_head(recved_pack[loca], 0);
+            ret = find_adc_head(recved_pack + loca, 0);
             if(ret == 100){
                 break;
             }
             loca += ret;
-            _channel = bit_head_read(recved_pack[loca], 'c');
+            _channel = bit_head_read(recved_pack + loca, 'c');
             (list_adc[_channel] + adc_count[_channel])->m_location = loca;
             (list_adc[_channel] + adc_count[_channel])->m_channel = _channel;
-            (list_adc[_channel] + adc_count[_channel])->m_length = bit_head_read(recved_pack[loca], 'l');
-            (list_adc[_channel] + adc_count[_channel])->m_timestamp = bit_time_read(recved_pack[loca]);
+            (list_adc[_channel] + adc_count[_channel])->m_length = bit_head_read(recved_pack + loca, 'l');
+            (list_adc[_channel] + adc_count[_channel])->m_timestamp = bit_time_read(recved_pack + loca);
             loca += (list_adc[_channel] + adc_count[_channel])->m_length;
             adc_count[_channel]++;
         }
@@ -180,11 +185,11 @@ void *example_analys(void *example_me){
     loca = 0;
     long long *valid_time = (long long *)malloc(sizeof(long long) * 1250);
     if(channel_num > 4){
-        int valid_count = get_timestamp(valid_time, list_adc[0], adc_count[0], list_adc[7], adc_count[7]);
+        valid_num = get_timestamp(valid_time, list_adc[0], adc_count[0], list_adc[7], adc_count[7]);
     }else{
-        int valid_count = get_timestamp(valid_time, list_adc[min_channel], adc_count[min_channel], list_adc[min_channel], adc_count[min_channel]);
+        valid_num = get_timestamp(valid_time, list_adc[min_channel], adc_count[min_channel], list_adc[min_channel], adc_count[min_channel]);
     }
-    for(int i = 0; i < valid_count; i++){
+    for(int i = 0; i < valid_num; i++){
         for(_channel = min_channel; _channel < min_channel + channel_num; _channel++){
             for(; valid_count[_channel] < adc_count[_channel];){
                 if(abs((list_adc[_channel] + valid_count[_channel])->m_timestamp - *(valid_time + i)) < DELAY_MAX){
@@ -216,9 +221,9 @@ void *example_analys(void *example_me){
                 loca += (list_adc[c] + valid_count[c])->m_length + 1;
             }
             value = value | loca;
-            fwrite(value, 4, 1, log_save);
+            fwrite(&value, 4, 1, log_save);
             for(int c = 0; c < 8; c++){
-                fwrite(recved_pack[(list_adc[c] + valid_count[c])->m_location], 4, (list_adc[c] + valid_count[c])->m_length + 1, log_save);
+                fwrite(recved_pack + (list_adc[c] + valid_count[c])->m_location, 4, (list_adc[c] + valid_count[c])->m_length + 1, log_save);
             }
             fflush(log_save);
         }
@@ -237,6 +242,7 @@ void *data_analys(){
 
     while(work != -1){
         sem_wait(sem + 1);
+        printf("debug: data_analys start\n");
         for(int i = 0; i < board_num; i++){
             ret = find_board_head(recved_pack + board_location[i], 0);
             if(ret == 100){
@@ -285,7 +291,7 @@ void *data_analys(){
         }
 
         for(int i = 0; i < 3; i++){
-            pthread_join(ana_ptd + i, 0);
+            pthread_join(ana_ptd[i], 0);
         }
         free(_me);
         memset(recved_pack, 0, sizeof(recved_pack));
@@ -294,7 +300,7 @@ void *data_analys(){
 }
 
 int main(){
-    
+    error_fp = open_error_log();
 
     char sig;
     while (sig != 'y')
