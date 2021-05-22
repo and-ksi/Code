@@ -3,6 +3,7 @@
 //需要被初始化以及随环境改变的参数
 int client_num = 3;
 int channel_num = 8;
+int min_channel = 0;
 int port = 10000;
 
 //功能指示
@@ -109,6 +110,7 @@ void socket_create()
     int socket_fd;
     socklen_t len;
 
+    int send_info[3];
     char buf[10] = {'\0'};
 
     struct sockaddr_in localaddr = {0};
@@ -145,11 +147,14 @@ void socket_create()
             perror("Accept fail\n");
             exit(1);
         }
-        sprintf(buf, "%d", i);
-        ret = send(*(acfd + i), buf, sizeof(buf), 0);
+        send_info[0] = i;
+        send_info[1] = channel_num;
+        send_info[2] = min_channel - 1;
+        //sprintf(buf, "%d", i);
+        ret = send(*(acfd + i), send_info, sizeof(buf), 0);
         if(ret < 0){
-            fprintf(error_fp, "\nSend recv_id failed: buf[%s]\n", buf);
-            perror("Send recv_id failed!\n");
+            fprintf(error_fp, "\nSend send_info failed: [0]%d [1]%d]\n", send_info[0], send_info[1]);
+            perror("Send send_info failed!\n");
             fclose(error_fp);
             exit(1);
         }
@@ -167,7 +172,7 @@ void socket_create()
 
 void *data_part_send(){
     int ret;
-    int location;
+    int location, end_address;
     int board_location[1024];
     int board_num;
     int mark_send[2];
@@ -177,27 +182,32 @@ void *data_part_send(){
     while(work != -1){
         sem_wait(sem + 2);
 
-        board_location[0] = find_board_head(pData, 0);
-        for(board_num = 1; board_num < 1024; board_num++){
-            location = find_board_head(pData + board_location[board_num - 1] + 1024, 1);
+        //board_location[0] = find_board_head(pData, 0);
+        for(board_num = 0; board_num < 1024; board_num++){
+            location = find_board_head(pData + board_location[board_num], 0);
             if(location == 100){
-                board_num--;
+                board_location[board_num] = 0;
+                //board_num--;
                 break;
             }
-            board_location[board_num] = board_location[board_num - 1] + 1024 + location;
+            board_location[board_num] +=  location;
+            board_location[board_num + 1] = board_location[board_num] + 1024;
         }
         location = board_num / client_num + 1;
 
-        for(int i = 1; i < client_num; i++){
-            ret = send(acfd[i], pData + board_location[i * location],
-             4 * (board_location[i * location + 1] - board_location[(i - 1) * location]), 0);
+        for(int i = 1; i <= client_num; i++){
+            if ((end_address = i * location) > board_num){
+                end_address = board_num;
+            }
+            ret = send(acfd[i - 1], pData + board_location[i * location],
+             4 * (board_location[end_address] - board_location[(i - 1) * location]) + 4 * 1024, 0);
             if(ret < 0){
                 printf("Data send failed! socket_count: %d\n", socket_count);
                 fprintf(error_fp, "\nData send failed! socket_count: %d\n", socket_count);
                 exit(1);
             }
-            mark_send[0] = board_num / client_num + 1;
-            mark_send[1] = 4 * (board_location[i * location + 1] - board_location[(i - 1) * location]);
+            mark_send[0] = end_address - (i - 1) * location + 1;
+            mark_send[1] = 4 * (board_location[end_address] - board_location[(i - 1) * location]);
             ret = send(acfd[i], mark_send, sizeof(mark_send), 0);
             if(ret < 0){
                 printf("Mark_send send failed! : %d, %d\n", mark_send[0], mark_send[1]);
@@ -215,13 +225,15 @@ void *data_part_send(){
 int main(int argc, char const *argv[]){
     char sig;
     while(sig != 'y'){
-        printf("Port = %d\nClient_num = %d\nChannel_num = %d\nPress'y' to continue...\n", port, client_num, channel_num);
+        printf("Port = %d\nClient_num = %d\nChannel_num = %d\nMin_channel = %d\nPress'y' to continue...\n", port, client_num, channel_num, min_channel);
+        sig = getchar();
         if(sig != 'y'){
-            printf("port, client_num, channel_num\n");
-            scanf("%d%d%d", &port, &client_num, &channel_num);
+            printf("port, client_num, channel_num, min_channel\n");
+            scanf("%d %d %d %d", &port, &client_num, &channel_num, &min_channel);
         }
     }
-    fprintf(error_fp, "\nPort = %d\nClient_num = %d\nChannel_num = %d\n", port, client_num, channel_num);
+    fprintf(error_fp, "\nPort = %d\nClient_num = %d\nChannel_num = %d\nMin_channel = %d\n", port, client_num, channel_num, min_channel);
+    fflush(error_fp);
 
     unsigned int pos = 0;
     unsigned int cnontrol_3;

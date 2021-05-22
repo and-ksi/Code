@@ -26,6 +26,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <dirent.h>
 
 #define DEVICE_NAME_H2C_0 "/dev/xdma0_h2c_0"
 #define DEVICE_NAME_C2H_0 "/dev/xdma0_c2h_0"
@@ -54,13 +55,13 @@
 
 #define ENERGY_OF_MOUN (105.7)
 
-struct location_timestamp
+typedef struct location_timestamp
 {
     int m_location;
     long long m_timestamp;
     int m_length;
-    //int m_channel;
-};
+    int m_channel;
+}LOCA_TIME;
 
 //根据CPU创建和分配线程
 void ptd_create(pthread_t *arg, int k, void *functionbody)
@@ -102,7 +103,7 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
         exit(1);
     } */
 
-    pthread_create(arg, &attr, (void *(*)(void *))functionbody, NULL);
+    pthread_create(arg, &attr, functionbody, NULL);
     //printf("Id为%d的线程已创建完毕。", *arg);
 
     pthread_attr_destroy(&attr); //销除线程属性
@@ -237,7 +238,7 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0)
 
     case 'c':
 
-        return (*in_ & 0x000000ff) - 1 - 4;
+        return (*in_ & 0x000000ff) - 1;
         break;
 
     case 'e':
@@ -354,12 +355,16 @@ double bit_float_read(unsigned int *in_, int d)
 
 void *open_error_log()
 {
+    if (NULL == opdir("log"))
+    {
+        mkdir("log", 0777);
+    }
     time_t t;
     char buf[50];
     struct tm *lt;
     time(&t);           //获取Unix时间戳。
     lt = localtime(&t); //转为时间结构。
-    sprintf(buf, "log/error_%d:%d:%d.log\n", lt->tm_hour, lt->tm_min, lt->tm_sec);
+    sprintf(buf, "log/error_%d:%d_%d:%d:%d.log", lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
 
     FILE *error_log = fopen(buf, "w+");
     if (error_log == NULL)
@@ -385,6 +390,29 @@ void write_error_log(FILE *_fp, unsigned int *edata)
     fclose(_fp);
 }
 
+void *open_savelog(int num){
+    if (NULL == opdir("datalog"))
+    {
+        mkdir("datalog", 0777);
+    }
+    char buf[100];
+    FILE *log_save;
+
+    time_t t;
+    struct tm *lt;
+    time(&t);           //获取Unix时间戳。
+    lt = localtime(&t); //转为时间结构。
+    sprintf(buf, "datalog/savelog_%d:%d_%d:%d:%d.log", lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
+    log_save = fopen(buf, 'w+');
+    if (log_save == NULL)
+    {
+        printf("Log_save create failed!\n");
+        exit(1);
+    }
+    fwrite(num, 4, 1, log_save);
+    return log_save;
+}
+
 int find_board_head(unsigned int *in_, int k){
     for(int i = 0; i < 10; i++){
         if(*(in_ + i) == 0xf00f){
@@ -404,10 +432,10 @@ int find_adc_head(unsigned int *in_, int k){
             return i;
         }
         if (*(in_ + i) == 0x66666666 || (*(in_ + i) == 0x7000f000 && *(in_ + i + 1) == 0x7000f000)){
-            return 10;
+            return 100;
         }
     }
-    return 10;
+    return 100;
 }
 
 void take_head_to_struct(void *m_struct_, unsigned int *in_){
