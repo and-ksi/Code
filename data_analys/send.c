@@ -19,7 +19,7 @@ int control_fd;
 void *control_base;
 int interrupt_fd;
 int read_end_addr;
-unsigned int pData[RX_SIZE / 4];
+unsigned int pData[PACK_SIZE];
 
 //socket 变量
 int acfd[8];
@@ -53,9 +53,7 @@ void *rx_process(int id)
         //printf("read_end_addr = %x \n", read_end_addr);
         lseek(c2h_fd[id], (read_end_addr - (50 - id * 25) * 1024 * 1024), SEEK_SET);
         read(c2h_fd[id], pData, sizeof(pData)); //10MB
-        /* fwrite(pData[0], 4, RX_SIZE / 4, error_fp);
-        fclose(error_fp);
-        exit(1); */
+
         printf("debug:  read data finished!\n");
         sem_post(sem + 2);
     }
@@ -113,7 +111,7 @@ void socket_create()
     int socket_fd;
     socklen_t len;
 
-    int send_info[3];
+    int send_info[4];
     char buf[10] = {'\0'};
 
     struct sockaddr_in localaddr = {0};
@@ -153,6 +151,7 @@ void socket_create()
         send_info[0] = i;
         send_info[1] = channel_num;
         send_info[2] = min_channel - 1;
+        send_info[3] = client_num;
         //sprintf(buf, "%d", i);
         ret = send(*(acfd + i), send_info, sizeof(buf), 0);
         if(ret < 0){
@@ -175,18 +174,22 @@ void socket_create()
 
 void *data_part_send(){
     int ret;
-    int location, end_address;
-    int board_location[1024];
+    int send_num, end_num, start_num;
+    int start_address, end_address;
+    //int board_location[1024];
     int board_num;
     int mark_send[2];
 
     socket_count = 0;
     printf("debug: data part and send start !\n");
     while(work != -1){
+        board_num = BOARD_NUM;
         sem_wait(sem + 2);
         printf("debug: start part and send data\n");
-        //board_location[0] = find_board_head(pData, 0);
-        for(board_num = 0; board_num < 1024; board_num++){
+        /* 
+        //debug
+        board_location[0] = find_board_head(pData, 0);
+        for(board_num = 0; board_num < 1300; board_num++){
             printf("debug: 0here's no bug !\n");
             location = find_board_head(pData + board_location[board_num], 0);
             if(location == 100){
@@ -195,37 +198,55 @@ void *data_part_send(){
                 break;
             }
             board_location[board_num] +=  location;
+            write_data_error_log(&error_fp, pData + board_location[board_num], 1030, 1);
+            exit(1);
             write_error_log(&error_fp, pData + board_location[board_num], 1);
             board_location[board_num + 1] = board_location[board_num] + 1024;
             printf("debug: 1here's no bug !\n");
-        }
+        } 
         location = board_num / client_num + 1;
-        exit(1);
+        exit(1); */
 
-//debug
-/*         for(int i = 1; i <= client_num; i++){
-            if ((end_address = i * location) > board_num){
-                end_address = board_num;
+        ret = find_board_head(pData + BOARD_NUM * 1024 + 1024, 0);
+        if(ret < 100){
+            for(; board_num < BOARD_NUM + 10; board_num++){
+                ret = find_board_head(pData + board_num * 1024 + 1024, 0);
+                if(ret == 100){
+                    break;
+                }
             }
-            ret = send(acfd[i - 1], pData + board_location[i * location],
-             4 * (board_location[end_address] - board_location[(i - 1) * location]) + 4 * 1024, 0);
+        }
+        send_num = board_num / client_num + 1;
+        for(int i = 1; i <= client_num; i++){
+            if ((end_num = i * send_num) > board_num){
+                end_num = board_num;
+            }
+            start_num = (i - 1) * send_num;
+            start_address = start_num * 1024 + find_board_head(pData + start_num * 1024, 1);
+            ret = find_board_head(pData + (end_num + 1) * 1024, 1);
+            if(ret == 100){
+                ret = 0;
+            }
+            end_address = (end_num + 1) * 1024 + ret;
+            ret = send(acfd[i - 1], pData + start_address, 4 * (end_address - start_address), 0);
             if(ret < 0){
                 printf("Data send failed! socket_count: %d\n", socket_count);
                 fprintf(error_fp, "\nData send failed! socket_count: %d\n", socket_count);
+                write_data_error_log(error_fp, pData, PACK_SIZE, 0);
                 exit(1);
             }
 
             printf("debug: 第%d次发送: to %d client. board_num: %d, end_address: %d\n", i, i, board_num, end_address);
 
-            mark_send[0] = end_address - (i - 1) * location + 1;
+/*             mark_send[0] = end_address - (i - 1) * location + 1;
             mark_send[1] = 4 * (board_location[end_address] - board_location[(i - 1) * location]);
             ret = send(acfd[i], mark_send, sizeof(mark_send), 0);
             if(ret < 0){
                 printf("Mark_send send failed! : %d, %d\n", mark_send[0], mark_send[1]);
                 fprintf(error_fp, "\nMark_send send failed! : %d, %d\n", mark_send[0], mark_send[1]);
                 exit(1);
-            }
-        }*/
+            } */
+        }
         memset(pData, 0, sizeof(pData));
         sem_post(sem + 0);
         socket_count++;
@@ -237,6 +258,7 @@ void *data_part_send(){
 int main(int argc, char const *argv[]){
     char sig;
     error_fp = open_error_log();
+    fprintf(error_fp, "This is send.c error.log!\n");
     while(sig != 'y'){
         printf("Port = %d\nClient_num = %d\nChannel_num = %d\nMin_channel = %d\nPress'y' to continue...\n", port, client_num, channel_num, min_channel);
         sig = getchar();

@@ -36,9 +36,10 @@
 #define MAP_SIZE (0x7FFFFFFF) //8bit 2GB    ;max value of int
 #define MAP_BYPASS_SIZE (4 * 1024)
 #define IMG_RAM_POS (0)
-#define RX_SIZE (5 * 1024 * 1024) //1byte 8bit
+#define RX_SIZE (4 * (BOARD_NUM + 10) * 1024) //1byte 8bit
+#define BOARD_NUM (1280)//5MB
 
-#define PACK_SIZE (RX_SIZE / 16)
+#define PACK_SIZE (RX_SIZE / 4)
 
 //ana data
 #define SQRT_SIZE (100)          //mm
@@ -378,7 +379,7 @@ void *open_error_log()
 void write_error_log(FILE **_fp, unsigned int *edata, int m_mark)
 {
     FILE **error_fp = (FILE **)_fp;
-    if(!m_mark){
+    if(m_mark){
         for (int i = -50; i < 0; i++)
         {
             fprintf(*error_fp, "%x\n", *(edata + i));
@@ -390,6 +391,26 @@ void write_error_log(FILE **_fp, unsigned int *edata, int m_mark)
     {
         fprintf(*error_fp, "%x\n", *(edata + i));
     }
+    //fclose(_fp);
+}
+
+void write_data_error_log(FILE **_fp, unsigned int *edata, int count, int m_mark)
+{
+    FILE **error_fp = (FILE **)_fp;
+    if (m_mark)
+    {
+        for (int i = - count / 2; i < 0; i++)
+        {
+            fprintf(*error_fp, "%x\n", *(edata + i));
+        }
+    }
+
+    fprintf(*error_fp, "\n");
+    for (int i = 0; i < count; i++)
+    {
+        fprintf(*error_fp, "%x\n", *(edata + i));
+    }
+    fflush(*error_fp);
     //fclose(_fp);
 }
 
@@ -421,6 +442,11 @@ int find_board_head(unsigned int *in_, int k){
     for(int i = 0; i < 10; i++){
         if(*(in_ + i) == 0xf00f){
             return i;
+        }
+        if(k){
+            if(*(in_ - i) == 0xf00f){
+                return -i;
+            }
         }
         if(*(in_ + i) == 0){
             return 100;
