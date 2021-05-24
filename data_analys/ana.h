@@ -36,8 +36,9 @@
 #define MAP_SIZE (0x7FFFFFFF) //8bit 2GB    ;max value of int
 #define MAP_BYPASS_SIZE (4 * 1024)
 #define IMG_RAM_POS (0)
-#define RX_SIZE (4 * (BOARD_NUM + 10) * 1024) //1byte 8bit
-#define BOARD_NUM (1280)//5MB
+#define RX_SIZE (4 * (BOARD_NUM) * 1024) //1byte 8bit
+#define BOARD_NUM (1280 * 2)//5MB
+#define CPU_CORE_NUM = (4)
 
 #define PACK_SIZE (RX_SIZE / 4)
 
@@ -65,7 +66,7 @@ typedef struct location_timestamp
 }LOCA_TIME;
 
 //根据CPU创建和分配线程
-void ptd_create(pthread_t *arg, int k, void *functionbody)
+void ptd_create(pthread_t *arg, int k, void *functionbody, void *m_arg, int m)
 {
     int ret;
 
@@ -78,7 +79,7 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
         exit(1);
     }
 
-    if (k != -1)
+    if (k != 0)
     { //k为-1时不使用核心亲和属性
         cpu_set_t cpusetinfo;
         CPU_ZERO(&cpusetinfo);
@@ -97,14 +98,16 @@ void ptd_create(pthread_t *arg, int k, void *functionbody)
 		perror("Setscope fail");
 		exit(1);
 	} */
-    /* ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); //线程分离属性:PTHREAD_CREATE_JOINABLE（非分离）
-    if (ret < 0)
-    {
-        perror("Detached fail");
-        exit(1);
-    } */
+    if(m != 0){
+        ret = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED); //线程分离属性:PTHREAD_CREATE_JOINABLE（非分离）
+        if (ret < 0)
+        {
+            perror("Detached fail");
+            exit(1);
+        }
+    }
 
-    pthread_create(arg, &attr, functionbody, NULL);
+    pthread_create(arg, &attr, functionbody, m_arg);
     //printf("debug: %d的线程已创建完毕。", k);
 
     pthread_attr_destroy(&attr); //销除线程属性
@@ -367,13 +370,13 @@ void *open_error_log()
     lt = localtime(&t); //转为时间结构。
     sprintf(buf, "log/error_%d-%d_%d-%d-%d.log", lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
 
-    FILE *error_log = fopen(buf, "w+");
-    if (error_log == NULL)
+    FILE *_error_log = fopen(buf, "w+");
+    if (_error_log == NULL)
     {
         printf("Error log file open failed!\n");
         exit(1);
     }
-    return error_log;
+    return _error_log;
 }
 
 void write_error_log(FILE **_fp, unsigned int *edata, int m_mark)
@@ -397,6 +400,7 @@ void write_error_log(FILE **_fp, unsigned int *edata, int m_mark)
 void write_data_error_log(FILE **_fp, unsigned int *edata, int count, int m_mark)
 {
     FILE **error_fp = (FILE **)_fp;
+    fprintf(*error_fp, "\n");
     if (m_mark)
     {
         for (int i = - count / 2; i < 0; i++)
@@ -421,21 +425,21 @@ void *open_savelog(int num){
     }
 
     char buf[100];
-    FILE *log_save;
+    FILE *_log_save;
 
     time_t t;
     struct tm *lt;
     time(&t);           //获取Unix时间戳。
     lt = localtime(&t); //转为时间结构。
     sprintf(buf, "datalog/savelog_%d-%d_%d-%d-%d.log", lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
-    log_save = fopen(buf, "w+");
-    if (log_save == NULL)
+    _log_save = fopen(buf, "w+");
+    if (_log_save == NULL)
     {
         printf("Log_save create failed!\n");
         exit(1);
     }
-    fwrite(&num, 4, 1, log_save);
-    return log_save;
+    fwrite(&num, 4, 1, _log_save);
+    return _log_save;
 }
 
 int find_board_head(unsigned int *in_, int k){

@@ -1,0 +1,9 @@
+This is recv.c error.log!
+
+Port = 10000
+ip = 192.168.3.4
+
+
+recv_id: 0    channel_num: 8
+min_channel: 0    client_num: 1
+

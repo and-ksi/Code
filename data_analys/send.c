@@ -232,7 +232,7 @@ void *data_part_send(){
             if(ret < 0){
                 printf("Data send failed! socket_count: %d\n", socket_count);
                 fprintf(error_fp, "\nData send failed! socket_count: %d\n", socket_count);
-                write_data_error_log(error_fp, pData, PACK_SIZE, 0);
+                write_data_error_log(&error_fp, pData, PACK_SIZE, 0);
                 exit(1);
             }
 
@@ -293,9 +293,9 @@ int main(int argc, char const *argv[]){
     dev_open_fun();
     //socket_create();
 
-    ptd_create(&rx_thread, -1, rx_process);
+    ptd_create(&rx_thread, 0, rx_process, 0, 0);
     pthread_create(&event_thread, 0, event_process, 0);
-    ptd_create(&part_send_thread, 3, data_part_send);
+    ptd_create(&part_send_thread, 1, data_part_send, 0, 0);
 
     while (sig != 'o')
     {
