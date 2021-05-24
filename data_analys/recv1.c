@@ -171,9 +171,11 @@ int get_timestamp(long long *m_valid, LOCA_TIME *channel_0, int count_0, LOCA_TI
 
     for (; i < count_0;)
     {
+        printf("%llx, %llx", (channel_0 + i)->m_timestamp, (channel_7 + m)->m_timestamp);
         if (abs((channel_0 + i)->m_timestamp - (channel_7 + m)->m_timestamp) < DELAY_MAX)
         {
             *(m_valid + valid_num) = channel_0->m_timestamp;
+            //printf("debug: \n");
             valid_num++;
         }
         else if (((channel_0 + i)->m_timestamp - (channel_7 + m)->m_timestamp) > 0)
@@ -212,31 +214,32 @@ void *example_analys(void *example_me)
         sem_wait(sem + ex_me->m_mark + 2);
         for (int i = 0; i < ex_me->m_board_num; i++)
         {
-            printf("debug: 读取第%d个BOARD\n", i);
-            start_loca = ex_me->start_address;
+            start_loca = ex_me->start_address + i * 1024;
             ret = find_board_head(recved_pack + start_loca, 0);
             if (ret == 100)
             {
                 i++;
+                //debug
+                printf("未读取到board_head, 第%d个board\n", i);
+                exit(1);
+
                 break;
             }
-            loca = start_loca += ret;
+            loca = start_loca = start_loca + ret;
 
             for (; loca - start_loca < 1024;)
             {
-                printf("debug: 读取第%d个BOARD  ADC\n", i);
                 ret = find_adc_head(recved_pack + loca, 0);
-                if (ret == 100)
+
+                if (ret == 100 || loca + ret - start_loca >= 1024)
                 {
-                    //break;
-                    printf("debug: 读取第%d个BOARD  的12个ADC\n", i + 1);
-                    ret = find_board_head(recved_pack + start_loca + 1024, 1);
+                    ret = find_board_head(recved_pack + start_loca + 1024, 0);
                     if (ret == 100)
                     {
                         i++;
                         break;
                     }
-                    loca += ret + 1024;
+                    loca = ret + start_loca + 1024;
                     for (int i = 0; i < 12; i++)
                     {
                         ret = find_adc_head(recved_pack + loca, 0);
@@ -265,15 +268,24 @@ void *example_analys(void *example_me)
                     (list_adc[_channel] + adc_count[_channel])->m_timestamp = bit_time_read(recved_pack + loca);
                     loca += (list_adc[_channel] + adc_count[_channel])->m_length;
                     adc_count[_channel]++;
+                    printf("debug: get adc %d", adc_count[_channel]);
                 }
             }
             printf("debug: 读取第%d个BOARD  ADC finished, analys adc_head\n", i);
 
             //debug
+            // printf("debug: adc_count: %d\n", adc_count[1]);
+            // write_data_error_log(&error_fp, recved_pack + start_loca, 50, 0);
             // fprintf(error_fp, "\n");
-            // fwrite(list_adc[0], 4, 400, error_fp);
+            // for(int m = 0; m < 8; m++){
+            //     for(int n = 0; n < adc_count[m]; n++){
+            //         fprintf(error_fp, "adc channel: %d\nlocation: %d\nlength: %d\ntimestamp:%lld\n\n", (list_adc[m] + n)->m_channel,
+            //                 (list_adc[m] + n)->m_location, (list_adc[m] + n)->m_length, (list_adc[m] + n)->m_timestamp);
+            //     }
+            // }
             // fprintf(error_fp, "\n");
-
+            // exit(1);
+            printf("adc_count[0]: %d, adc_count[4]: %d, adc_count[7]: %d\n", adc_count[0], adc_count[4], adc_count[7]);
             valid_time = (long long *)malloc(sizeof(long long) * 1280);
             if (channel_num > 4)
             {
@@ -283,6 +295,11 @@ void *example_analys(void *example_me)
             {
                 valid_num = get_timestamp(valid_time, list_adc[min_channel], adc_count[min_channel], list_adc[min_channel], adc_count[min_channel]);
             }
+
+            // debug
+            write_data_error_log(&error_fp, (unsigned int *)valid_time, 100, 0);
+            exit(1);
+
             for (int i = 0; i < valid_num; i++)
             {
                 for (_channel = min_channel; _channel < min_channel + channel_num; _channel++)
@@ -362,28 +379,10 @@ void *data_analys()
     pthread_t ana_ptd[3];
     EXAMPLE_B _me[3];
 
-    for (int i = 0; i < 3; i++)
+    //debug
+    for (int i = 0; i < 1; i++)
     {
         ptd_create(ana_ptd + i, i + 1, example_analys, _me + i, 0);
-        /*ret = pthread_attr_init(&attr); //初始化线程属性变量,成功返回0,失败-1
-        if (ret < 0)
-        {
-            perror("Init attr fail");
-            exit(1);
-        }
-        cpu_set_t cpusetinfo;
-        CPU_ZERO(&cpusetinfo);
-        CPU_SET((3 - i), &cpusetinfo); //将core1加入到cpu集中,同理可以将其他的cpu加入
-
-        ret = pthread_attr_setaffinity_np(&attr, sizeof(cpusetinfo), &cpusetinfo);
-        if (ret < 0)
-        {
-            perror("Core set fail");
-            exit(1);
-        }
-
-        pthread_create(ana_ptd + i, &attr, example_analys, _me + i);
-        pthread_attr_destroy(&attr); */
     }
 
     while (work != -1)
@@ -392,18 +391,6 @@ void *data_analys()
         sem_wait(sem + 1);
         printf("debug: data_analys start\n");
 
-        /*for(int i = 0; i < board_num; i++){
-            ret = find_board_head(recved_pack + board_location[i], 0);
-            if(ret == 100){
-                board_location[i] = 0;
-                board_num = i;
-                break;
-            }
-            board_location[i] += ret;
-            board_location[i + 1] = board_location[i] + 1024;
-        } 
-        loca = board_num / 3 + 1;*/
-
         ret = find_board_head(recved_pack + PACK_SIZE - 1024, 0);
         if (ret == 100)
         {
@@ -411,9 +398,12 @@ void *data_analys()
             write_data_error_log(&error_fp, recved_pack, PACK_SIZE, 0);
             break;
         }
-        recv_num = board_num / 3 + 1;
+        // debug
+        //recv_num = board_num / 3 + 1;
+        recv_num = board_num;
 
-        for(int i = 0; i < 3; i++){
+        //debug
+        for(int i = 0; i < 1; i++){
 
             start_num = i * recv_num;
 
@@ -435,13 +425,13 @@ void *data_analys()
         sem_post(sem + 3);
         sem_post(sem + 4);
 
+        sem_wait(sem + 1);
+        //sem_wait(sem + 1);
+        //sem_wait(sem + 1);
+        
+        printf("debug: analys end\n");
         //debug
         exit(1);
-
-        sem_wait(sem + 1);
-        sem_wait(sem + 1);
-        sem_wait(sem + 1);
-        printf("debug: analys end\n");
 
         memset(recved_pack, 0, sizeof(recved_pack));
         sem_post(sem + 0);

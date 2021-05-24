@@ -274,7 +274,7 @@ void *data_part_send()
 
 int main(int argc, char const *argv[])
 {
-    char sig;
+    char sig = 'y';
     error_fp = open_error_log();
     fprintf(error_fp, "This is send.c error.log!\n");
     while (sig != 'y')

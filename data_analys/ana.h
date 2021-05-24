@@ -460,17 +460,27 @@ int find_board_head(unsigned int *in_, int k){
 }
 
 int find_adc_head(unsigned int *in_, int k){
-    for(int i = 0; i < 10; i++){
+    int ret, ret1;
+    int i;
+    for(i = 0; i < 10; i++){
+        // ret = (*(in_ + i) << 16 >> 24) - 0x3f;
+        // ret1 = (*(in_ + i + 1) << 16 >> 24) - 0x3f;
+        // printf("i :%d, ret: %x, ret1: %x aaaaa\n", i, ret, ret1);
+        // if (ret == 0 && ret1 != 0)
         if (*(in_ + i) & 0x00003f00 == 0x00003f00 && *(in_ + i + 1) & 0x00003f00 != 0x00003f00)
         {
             return i;
+            break;
         }
         if (*(in_ + i) == 0x66666666 || (*(in_ + i) == 0x7000f000 && *(in_ + i + 1) == 0x7000f000)){
             return 100;
         }
+        
     }
     return 100;
 }
+
+//if(*(in_ + i) & 0x00003f00 == 0x00003f00 && *(in_ + i + 1) & 0x00003f00 != 0x00003f00)
 
 void take_head_to_struct(void *m_struct_, unsigned int *in_){
 
