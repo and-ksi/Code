@@ -182,12 +182,16 @@ void *recv_func()
     }
 }
 
-int get_timestamp(long long *m_valid, LOCA_TIME *channel_0, int count_0, LOCA_TIME *channel_7, int count_7)
+int get_timestamp(void *_valid, void *channel0, int count_0, void *channel7, int count_7)
 {
     //long long *m_valid = (long long *)malloc(sizeof(long long) * 1250);
-    memset(m_valid, 0, sizeof(m_valid));
 
-    int valid_num = 0;
+    printf("debug: get_timestamp ssstart! count_0: %d, count_7: %d", count_0, count_7);
+    long long *m_valid = (long long *)_valid;
+    LOCA_TIME *channel_0 = (LOCA_TIME *)channel0;
+    LOCA_TIME *channel_7 = (LOCA_TIME *)channel7;
+
+    int _valid_num = 0;
     int m = 0;
     int i = 0;
     int num;
@@ -202,9 +206,9 @@ int get_timestamp(long long *m_valid, LOCA_TIME *channel_0, int count_0, LOCA_TI
         //printf("%llx, %llx\n", (channel_0 + i)->m_timestamp, (channel_7 + m)->m_timestamp);
         if (abs((channel_0 + i)->m_timestamp - (channel_7 + m)->m_timestamp) < DELAY_MAX)
         {
-            *(m_valid + valid_num) = channel_0->m_timestamp;
-            printf("debug: get valid timestamp\n");
-            valid_num++;
+            *(m_valid + _valid_num) = channel_0->m_timestamp;
+            //printf("debug: get valid timestamp\n");
+            _valid_num++;
         }
         else if (((channel_0 + i)->m_timestamp - (channel_7 + m)->m_timestamp) > 0)
         {
@@ -212,15 +216,13 @@ int get_timestamp(long long *m_valid, LOCA_TIME *channel_0, int count_0, LOCA_TI
             if(m >= num){
                 break;
             }
-            continue;
         }
         else
         {
             i++;
-            continue;
         }
     }
-    return valid_num;
+    return _valid_num;
 }
 
 void *example_analys(void *example_me)
@@ -232,12 +234,12 @@ void *example_analys(void *example_me)
     int ret;
     unsigned int value;
     int _channel;
-    int valid_num;
-    LOCA_TIME list_adc[8][100];
-    int loca, start_loca;
+    int valid_num = 0;
+    LOCA_TIME list_adc[8][50];
+    int loca, start_loca, m, n;
     memset(list_adc, 0, sizeof(list_adc));
 
-    long long *valid_time;
+    long long valid_time[50] = {0};
 
     while (work != -1)
     {
@@ -263,7 +265,7 @@ void *example_analys(void *example_me)
             loca = start_loca = start_loca + ret;
 
             //printf("debug: loca: %d, start_loca: %d\n", loca, start_loca);
-
+            memset(adc_count, 0, sizeof(adc_count));
             for (; loca - start_loca < 1024;)
             {
                 ret = find_adc_head(recved_pack + loca, 0);
@@ -321,17 +323,49 @@ void *example_analys(void *example_me)
             // fprintf(error_fp, "\n");
             // for(int m = 0; m < 8; m++){
             //     for(int n = 0; n < adc_count[m]; n++){
-            //         fprintf(error_fp, "adc channel: %d\nlocation: %d\nlength: %d\ntimestamp:%lld\n\n", (list_adc[m] + n)->m_channel,
+            //         fprintf(error_fp, "adc channel: %d\nlocation: %d\nlength: %d\ntimestamp:%llx\n\n", (list_adc[m] + n)->m_channel,
             //                 (list_adc[m] + n)->m_location, (list_adc[m] + n)->m_length, (list_adc[m] + n)->m_timestamp);
             //     }
             // }
             // fprintf(error_fp, "\n");
             // exit(1);
             //printf("adc_count[0]: %d, adc_count[4]: %d, adc_count[7]: %d\n", adc_count[0], adc_count[4], adc_count[7]);
-            valid_time = (long long *)malloc(sizeof(long long) * 1280);
+
             if (channel_num > 4)
             {
-                valid_num = get_timestamp(valid_time, list_adc[0], adc_count[0], list_adc[7], adc_count[7]);
+                printf("debug: get_timestarm start! adc_count[0] = %d, adc_count[7] = %d\n", adc_count[0], adc_count[7]);
+
+                //valid_num = get_timestamp(valid_time, (void *)list_adc[0], adc_count[0], (void *)list_adc[7], adc_count[7]);
+
+                if(adc_count[0] > adc_count[7]){
+                    adc_count[0] = adc_count [7];
+                }
+                n = 0;
+                valid_num = 0;
+                for(m = 0; m < adc_count[0];){
+                    if(abs((list_adc[0] + m)->m_timestamp - (list_adc[7] + n)->m_timestamp) < DELAY_MAX){
+                        *(valid_time + valid_num) = (list_adc[0] + m)->m_timestamp;
+                        valid_num++;
+                        m++;
+                        n++;
+                        if (n == adc_count[7])
+                        {
+                            break;
+                        }
+                    }
+                    else if ((list_adc[0] + m)->m_timestamp > (list_adc[7] + n)->m_timestamp){
+                        m++;
+                    }else
+                    {
+                        n++;
+                        if(n == adc_count[7]){
+                            break;
+                        }
+                    }
+                }
+
+                printf("debug: get_timestarm finished\n");
+                //exit(1);
             }
             else
             {
@@ -341,8 +375,13 @@ void *example_analys(void *example_me)
             // debug
             // write_data_error_log(&error_fp, (unsigned int *)valid_time, 100, 0);
             // exit(1);
-            printf("debug: valid_num %d\n", valid_num);
+            // printf("debug: valid_num %d\n", valid_num);
+            // for(int l = 0; l < valid_num; l++){
+            //     printf("debug: valide[%d] = %llx\n", l, *(valid_time + l));
+            // }
+            // exit(1);
 
+            memset(valid_count, 0, sizeof(valid_count));
             for (int i = 0; i < valid_num; i++)
             {
                 for (_channel = min_channel; _channel < min_channel + channel_num; _channel++)
@@ -351,6 +390,7 @@ void *example_analys(void *example_me)
                     {
                         if (abs((list_adc[_channel] + valid_count[_channel])->m_timestamp - *(valid_time + i)) < DELAY_MAX)
                         {
+                            printf("debug: get a valid count\n");
                             break;
                         }
                         else
@@ -361,10 +401,12 @@ void *example_analys(void *example_me)
                     if (valid_count[_channel] == adc_count[_channel])
                     {
                         valid_count[_channel] = 0;
+                        printf("debug: error 0001\n");
                         break;
                     }
+                    printf("debug: _channel = %d\n", _channel);
                 }
-                if (_channel == min_channel + channel_num - 1)
+                if (_channel == min_channel + channel_num)
                 {
                     printf("debug: start save valid data\n");
                     if (log_save == NULL || valid_example_count == 0xffff)
@@ -402,7 +444,6 @@ void *example_analys(void *example_me)
                     printf("debug: save valid data finished\n");
                 }
             }
-            free(valid_time);
         }
         printf("debug: example analys finished\n");
         sem_post(sem + 1);
