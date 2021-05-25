@@ -216,6 +216,10 @@ void *example_analys(void *example_me)
         {
             start_loca = ex_me->start_address + i * 1024;
             ret = find_board_head(recved_pack + start_loca, 0);
+
+            // printf("debug: ret = %d\n", ret);
+            // exit(1);
+
             if (ret == 100)
             {
                 i++;
@@ -227,9 +231,15 @@ void *example_analys(void *example_me)
             }
             loca = start_loca = start_loca + ret;
 
+            printf("debug: loca: %d, start_loca: %d\n", loca, start_loca);
+
             for (; loca - start_loca < 1024;)
             {
                 ret = find_adc_head(recved_pack + loca, 0);
+
+                write_data_error_log(&error_fp, recved_pack + loca, 100, 0);
+                printf("debug: ret = %d\n", ret);
+                exit(1);
 
                 if (ret == 100 || loca + ret - start_loca >= 1024)
                 {
@@ -256,6 +266,7 @@ void *example_analys(void *example_me)
                         (list_adc[_channel] + adc_count[_channel])->m_timestamp = bit_time_read(recved_pack + loca);
                         loca += (list_adc[_channel] + adc_count[_channel])->m_length;
                         adc_count[_channel]++;
+                        printf("debug: adc_count[%d] : %d\n", _channel, adc_count[_channel]);
                     }
                 }
                 else
@@ -297,8 +308,8 @@ void *example_analys(void *example_me)
             }
 
             // debug
-            write_data_error_log(&error_fp, (unsigned int *)valid_time, 100, 0);
-            exit(1);
+            // write_data_error_log(&error_fp, (unsigned int *)valid_time, 100, 0);
+            // exit(1);
 
             for (int i = 0; i < valid_num; i++)
             {
