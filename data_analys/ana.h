@@ -207,8 +207,16 @@ static uint32_t read_control(void *base_addr, int offset)
 
 long long bit_time_read(unsigned int *in_)
 {
-    long long ret = *(in_ + 1);
-    return ((ret << 32) | *(in_ + 2));
+    //long long ret = *(in_ + 1);
+    //return ((ret << 32) | *(in_ + 2));
+
+    if((*(in_ + 2) >> 16) == 0xcccc){
+        return (*(in_ + 2) & 0x0000ffff);
+    }else
+    {
+        return *(in_ + 2);
+    }
+    
     /* ret = *(in_ + 1);
     return (*(in_ + 2) | (ret << 32)); */
 }
@@ -438,6 +446,7 @@ void *open_savelog(int num){
         printf("Log_save create failed!\n");
         exit(1);
     }
+    printf("debug: open savelog success!\n");
     fwrite(&num, 4, 1, _log_save);
     return _log_save;
 }

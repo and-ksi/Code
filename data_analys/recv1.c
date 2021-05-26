@@ -2,11 +2,11 @@
 #include "ana.h"
 
 //从socket接收并进行改变
-int channel_num;
-int min_channel;
+int channel_num = 8;
+int min_channel = 0;
 int end_location;
 int board_num = 1024;
-int client_num;
+int client_num = 1;
 
 //功能控制
 int work;
@@ -135,14 +135,17 @@ void *recv_func()
                 fclose(error_fp);
                 exit(1);
             }
+
             recved_ll += ret;
         }
+        printf("debug: recv_ll = %d\n", recved_ll);
+
+        write_data_error_log(&error_fp, recved_pack, PACK_SIZE, 0);
+        // exit(1);
 
         //debug
         // write_data_error_log(&error_fp, recved_pack, recv_num, 0);
         // exit(1);
-        
-        printf("debug: recv_ll = %d\n", recved_ll);
 
         //debug
         /* ret = recv(socket_fd, mark_recv, sizeof(mark_recv), 0);
@@ -201,12 +204,12 @@ void *example_analys(void *example_me)
     int ret;
     unsigned int value;
     int _channel;
-    int valid_num;
-    LOCA_TIME list_adc[8][100];
-    int loca, start_loca;
+    int valid_num = 0;
+    LOCA_TIME list_adc[8][50];
+    int loca, start_loca, m, n;
     memset(list_adc, 0, sizeof(list_adc));
 
-    long long *valid_time;
+    long long valid_time[50] = {0};
 
     while (work != -1)
     {
@@ -214,7 +217,11 @@ void *example_analys(void *example_me)
         sem_wait(sem + ex_me->m_mark + 2);
         for (int i = 0; i < ex_me->m_board_num; i++)
         {
+            printf("debug: find 第%d个board>head\n", i);
             start_loca = ex_me->start_address + i * 1024;
+            if(start_loca >= PACK_SIZE - 10){
+                break;
+            }
             ret = find_board_head(recved_pack + start_loca, 0);
 
             // printf("debug: ret = %d\n", ret);
@@ -231,18 +238,27 @@ void *example_analys(void *example_me)
             }
             loca = start_loca = start_loca + ret;
 
-            printf("debug: loca: %d, start_loca: %d\n", loca, start_loca);
-
+            //printf("debug: loca: %d, start_loca: %d\n", loca, start_loca);
+            memset(adc_count, 0, sizeof(adc_count));
             for (; loca - start_loca < 1024;)
             {
+                if (loca >= PACK_SIZE - 10)
+                {
+                    i++;
+                    break;
+                }
                 ret = find_adc_head(recved_pack + loca, 0);
 
-                write_data_error_log(&error_fp, recved_pack + loca, 100, 0);
-                printf("debug: ret = %d\n", ret);
-                exit(1);
+                // write_data_error_log(&error_fp, recved_pack + loca, 100, 0);
+                // printf("debug: ret = %d\n", ret);
+                // exit(1);
 
                 if (ret == 100 || loca + ret - start_loca >= 1024)
                 {
+                    if(start_loca + 1024 >= PACK_SIZE - 10){
+                        i++;
+                        break;
+                    }
                     ret = find_board_head(recved_pack + start_loca + 1024, 0);
                     if (ret == 100)
                     {
@@ -252,6 +268,11 @@ void *example_analys(void *example_me)
                     loca = ret + start_loca + 1024;
                     for (int i = 0; i < 12; i++)
                     {
+                        if (loca >= PACK_SIZE - 10)
+                        {
+                            i++;
+                            break;
+                        }
                         ret = find_adc_head(recved_pack + loca, 0);
                         if (ret == 100)
                         {
@@ -279,10 +300,10 @@ void *example_analys(void *example_me)
                     (list_adc[_channel] + adc_count[_channel])->m_timestamp = bit_time_read(recved_pack + loca);
                     loca += (list_adc[_channel] + adc_count[_channel])->m_length;
                     adc_count[_channel]++;
-                    printf("debug: get adc %d", adc_count[_channel]);
+                    //printf("debug: get adc %d", adc_count[_channel]);
                 }
             }
-            printf("debug: 读取第%d个BOARD  ADC finished, analys adc_head\n", i);
+            //printf("debug: 读取第%d个BOARD  ADC finished, analys adc_head\n", i);
 
             //debug
             // printf("debug: adc_count: %d\n", adc_count[1]);
@@ -296,21 +317,56 @@ void *example_analys(void *example_me)
             // }
             // fprintf(error_fp, "\n");
             // exit(1);
-            printf("adc_count[0]: %d, adc_count[4]: %d, adc_count[7]: %d\n", adc_count[0], adc_count[4], adc_count[7]);
-            valid_time = (long long *)malloc(sizeof(long long) * 1280);
+            //printf("adc_count[0]: %d, adc_count[4]: %d, adc_count[7]: %d\n", adc_count[0], adc_count[4], adc_count[7]);
+            //valid_time = (long long *)malloc(sizeof(long long) * 1280);
             if (channel_num > 4)
             {
-                valid_num = get_timestamp(valid_time, list_adc[0], adc_count[0], list_adc[7], adc_count[7]);
+                // valid_num = get_timestamp(valid_time, list_adc[0], adc_count[0], list_adc[7], adc_count[7]);
+                if(adc_count[0] > adc_count[7]){
+                    adc_count[0] = adc_count [7];
+                }
+                n = 0;
+                valid_num = 0;
+                for(m = 0; m < adc_count[0];){
+                    if(abs((list_adc[0] + m)->m_timestamp - (list_adc[7] + n)->m_timestamp) < DELAY_MAX){
+                        *(valid_time + valid_num) = (list_adc[0] + m)->m_timestamp;
+                        valid_num++;
+                        m++;
+                        n++;
+                        if (n == adc_count[7])
+                        {
+                            break;
+                        }
+                    }
+                    else if ((list_adc[0] + m)->m_timestamp > (list_adc[7] + n)->m_timestamp){
+                        m++;
+                    }else
+                    {
+                        n++;
+                        if(n == adc_count[7]){
+                            break;
+                        }
+                    }
+                }
+
+                printf("debug: get_timestarm finished\n");
+                //exit(1);
             }
             else
             {
                 valid_num = get_timestamp(valid_time, list_adc[min_channel], adc_count[min_channel], list_adc[min_channel], adc_count[min_channel]);
             }
 
+            for(int c = 0; c < min_channel + channel_num; c++){
+                if(adc_count[c] < valid_num){
+                    valid_num = adc_count[c];
+                }
+            }
+
             // debug
             // write_data_error_log(&error_fp, (unsigned int *)valid_time, 100, 0);
             // exit(1);
-
+            memset(valid_count, 0, sizeof(valid_count));
             for (int i = 0; i < valid_num; i++)
             {
                 for (_channel = min_channel; _channel < min_channel + channel_num; _channel++)
@@ -332,7 +388,7 @@ void *example_analys(void *example_me)
                         break;
                     }
                 }
-                if (_channel == min_channel + channel_num - 1)
+                if (_channel == min_channel + channel_num)
                 {
                     printf("debug: start save valid data\n");
                     if (log_save == NULL || valid_example_count == 0xffff)
@@ -340,7 +396,7 @@ void *example_analys(void *example_me)
                         pthread_mutex_lock(&mute);
                         if (log_save == NULL)
                         {
-                            log_save = open_savelog(file_count);
+                            log_save = (FILE *)open_savelog(file_count);
                         }
                         else
                         {
@@ -363,14 +419,15 @@ void *example_analys(void *example_me)
                     fwrite(&value, 4, 1, log_save);
                     for (int c = min_channel; c < min_channel + channel_num; c++)
                     {
-                        fwrite(recved_pack + (list_adc[c] + valid_count[c])->m_location, 4, (list_adc[c] + valid_count[c])->m_length + 1, log_save);
+                        fwrite(recved_pack + (list_adc[c] + valid_count[c])->m_location, 4, ((list_adc[c] + valid_count[c])->m_length + 1), log_save);
+                        printf("debug: write savelog success!\n");
                     }
                     fflush(log_save);
                     pthread_mutex_unlock(&mute);
                     printf("debug: save valid data finished\n");
                 }
             }
-            free(valid_time);
+            //free(valid_time);
         }
         printf("debug: example analys finished\n");
         sem_post(sem + 1);
@@ -407,7 +464,7 @@ void *data_analys()
         {
             fprintf(error_fp, "cant find the last board! recv_count:%d\n", recv_count);
             write_data_error_log(&error_fp, recved_pack, PACK_SIZE, 0);
-            break;
+            exit(1);
         }
         // debug
         //recv_num = board_num / 3 + 1;
