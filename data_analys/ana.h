@@ -210,13 +210,30 @@ long long bit_time_read(unsigned int *in_)
     //long long ret = *(in_ + 1);
     //return ((ret << 32) | *(in_ + 2));
 
-    if((*(in_ + 2) >> 16) == 0xcccc){
-        return (*(in_ + 2) & 0x0000ffff);
-    }else
-    {
-        return *(in_ + 2);
+    long long ret = 0, ret1, ret2;
+    int i, n = 0;
+    for(i = 1;; i++){
+        ret1 = ((*(in_ + i) & 0xffff0000) >> 16);
+        ret2 = *(in_ + i) & 0x0000ffff;
+        if (ret1 == 0xdddd || ret1 == 0xcccc || ret1 == 0xf000){
+            n++;
+        }else{
+            break;
+        }
+        if (ret2 == 0xdddd || ret2 == 0xcccc || ret2 == 0xf000){
+            n++;
+        }else{
+            break;
+        }
     }
-    
+    if(n & 1){
+        ret = ((long long)ret2 << 48);
+        ret = ret | ((long long)(*(in_ + i + 1)) << 16);
+        return ret = ret | ((*in_ + i + 2) >> 16);
+    }else{
+        ret = ((long long)(*(in_ + i)) << 32);
+        return ret = ret | (*(in_ + i + 1));
+    }
     /* ret = *(in_ + 1);
     return (*(in_ + 2) | (ret << 32)); */
 }
@@ -454,7 +471,7 @@ void *open_savelog(int num){
 int find_board_head(unsigned int *in_, int k){
     for(int i = 0; i < 10; i++){
         if(*(in_ + i) == 0xf00f){
-            printf("debug: find_board_head: ret = %d\n", i);
+            //printf("debug: find_board_head: ret = %d\n", i);
             return i;
         }
         if(k){
@@ -478,13 +495,18 @@ int find_adc_head(unsigned int *in_, int k){
         // printf("i :%d, ret: %x, ret1: %x aaaaa\n", i, ret, ret1);
         // if (ret == 0 && ret1 != 0)
         //printf("debug: find_adc_head: ret = %d formal: %x  value: %d\n", i, *(in_ + i), ((*(in_ + i) & 0x0000ff00) == 0x00003f00));
-        if ((*(in_ + i) & 0x0000ff00) == 0x00003f00 && (*(in_ + i + 1) & 0x0000ff00) != 0x00003f00)
+        if ((*(in_ + i) & 0x0000fff0) == 0x00003f00 && (*(in_ + i + 1) & 0x0000fff0) != 0x00003f00)
         {
             //printf("debug: find_adc_head: ret = %d\n", i);
-            return i;
+            if(bit_head_read(in_ + i, 'c') < 8 && bit_head_read(in_ + i, 'l') < 100){
+                return i;
+            }
         }
-        if (*(in_ + i) == 0x66666666 || (*(in_ + i) == 0x7000f000 && *(in_ + i + 1) == 0x7000f000)){
-            return 100;
+       if ((*(in_ - i) & 0x0000fff0) == 0x00003f00 && (*(in_ - i + 1) & 0x0000fff0) != 0x00003f00)
+        {
+            if(bit_head_read(in_ - i, 'c') < 8 && bit_head_read(in_ - i, 'l') < 100){
+                return -i;
+            }
         }
         
     }

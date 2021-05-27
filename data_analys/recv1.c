@@ -140,7 +140,7 @@ void *recv_func()
         }
         printf("debug: recv_ll = %d\n", recved_ll);
 
-        write_data_error_log(&error_fp, recved_pack, PACK_SIZE, 0);
+        //write_data_error_log(&error_fp, recved_pack, PACK_SIZE, 0);
         // exit(1);
 
         //debug
@@ -156,7 +156,7 @@ void *recv_func()
         }
         board_num = mark_recv[0];
         end_location = mark_recv[1]; */
-
+        while(work == 1);
         recv_count++;
         sem_post(sem + 1);
         printf("debug: recv data success: %d\n", recv_count);
@@ -213,15 +213,16 @@ void *example_analys(void *example_me)
 
     while (work != -1)
     {
-        printf("debug: example analys start\n");
+        //printf("debug: example analys start\n");
         sem_wait(sem + ex_me->m_mark + 2);
         for (int i = 0; i < ex_me->m_board_num; i++)
         {
-            printf("debug: find 第%d个board>head\n", i);
+            //printf("debug: find 第%d个board>head\n", i);
             start_loca = ex_me->start_address + i * 1024;
             if(start_loca >= PACK_SIZE - 10){
                 break;
             }
+            //printf("debug: get board0 head ret = %d\n", ret);
             ret = find_board_head(recved_pack + start_loca, 0);
 
             // printf("debug: ret = %d\n", ret);
@@ -247,7 +248,9 @@ void *example_analys(void *example_me)
                     i++;
                     break;
                 }
+                
                 ret = find_adc_head(recved_pack + loca, 0);
+                //printf("debug: get adc0 head ret = %d\n", ret);
 
                 // write_data_error_log(&error_fp, recved_pack + loca, 100, 0);
                 // printf("debug: ret = %d\n", ret);
@@ -259,7 +262,9 @@ void *example_analys(void *example_me)
                         i++;
                         break;
                     }
+                    
                     ret = find_board_head(recved_pack + start_loca + 1024, 0);
+                    //printf("debug: get board1 head ret = %d\n", ret);
                     if (ret == 100)
                     {
                         i++;
@@ -273,7 +278,9 @@ void *example_analys(void *example_me)
                             i++;
                             break;
                         }
+                        
                         ret = find_adc_head(recved_pack + loca, 0);
+                        //printf("debug: get adc1 head ret = %d, %x\n", ret, *(recved_pack + loca + ret));
                         if (ret == 100)
                         {
                             i++;
@@ -287,7 +294,8 @@ void *example_analys(void *example_me)
                         (list_adc[_channel] + adc_count[_channel])->m_timestamp = bit_time_read(recved_pack + loca);
                         loca += (list_adc[_channel] + adc_count[_channel])->m_length;
                         adc_count[_channel]++;
-                        printf("debug: adc_count[%d] : %d\n", _channel, adc_count[_channel]);
+                        //printf("debug: timestamp = %llx", (list_adc[_channel] + adc_count[_channel])-> m_timestamp);
+                        //printf("debug: adc_count[%d] : %d\n", _channel, adc_count[_channel]);
                     }
                 }
                 else
@@ -348,8 +356,13 @@ void *example_analys(void *example_me)
                         }
                     }
                 }
+                
+                //debug
+                // for(int y = 0; y < valid_num; y++){
+                //     printf("debug: %dtimestamp = %lld\n", y, valid_time[y]);
+                // }
 
-                printf("debug: get_timestarm finished\n");
+                //printf("debug: get_timestarm finished\n");
                 //exit(1);
             }
             else
@@ -390,7 +403,7 @@ void *example_analys(void *example_me)
                 }
                 if (_channel == min_channel + channel_num)
                 {
-                    printf("debug: start save valid data\n");
+                    //printf("debug: start save valid data\n");
                     if (log_save == NULL || valid_example_count == 0xffff)
                     {
                         pthread_mutex_lock(&mute);
@@ -420,16 +433,16 @@ void *example_analys(void *example_me)
                     for (int c = min_channel; c < min_channel + channel_num; c++)
                     {
                         fwrite(recved_pack + (list_adc[c] + valid_count[c])->m_location, 4, ((list_adc[c] + valid_count[c])->m_length + 1), log_save);
-                        printf("debug: write savelog success!\n");
+                        //printf("debug: write savelog success!\n");
                     }
                     fflush(log_save);
                     pthread_mutex_unlock(&mute);
-                    printf("debug: save valid data finished\n");
+                    //printf("debug: save valid data finished\n");
                 }
             }
             //free(valid_time);
         }
-        printf("debug: example analys finished\n");
+        //printf("debug: example analys finished\n");
         sem_post(sem + 1);
     }
 }
@@ -457,7 +470,7 @@ void *data_analys()
     {
         board_num = BOARD_NUM;
         sem_wait(sem + 1);
-        printf("debug: data_analys start\n");
+        //printf("debug: data_analys start\n");
 
         ret = find_board_head(recved_pack + PACK_SIZE - 1024, 0);
         if (ret == 100)
@@ -476,7 +489,7 @@ void *data_analys()
             start_num = i * recv_num;
 
             start_address = start_num * 1024 + find_board_head(recved_pack + start_num * 1024, 0);
-            printf("debug: start_address: %d\n", start_address);
+            //printf("debug: start_address: %d\n", start_address);
             (_me + i)->start_address = start_address;
             if (i == 2)
             {
@@ -488,7 +501,7 @@ void *data_analys()
             }
             (_me + i)->m_mark = i;
         }
-        printf("debug: analys start\n");
+        //printf("debug: analys start\n");
         sem_post(sem + 2);
         sem_post(sem + 3);
         sem_post(sem + 4);
@@ -497,9 +510,9 @@ void *data_analys()
         //sem_wait(sem + 1);
         //sem_wait(sem + 1);
         
-        printf("debug: analys end\n");
+        //printf("debug: analys end\n");
         //debug
-        exit(1);
+        //exit(1);
 
         memset(recved_pack, 0, sizeof(recved_pack));
         sem_post(sem + 0);
@@ -547,6 +560,8 @@ int main()
         sig = getchar();
         switch (sig)
         {
+        case 'w':
+            work = 1;
 
         default:
             break;
