@@ -121,23 +121,40 @@ int main(){
 } */
 
 //通过管线控制gnuplot绘图
+// #include <stdio.h>
+// int main()
+// {
+//     FILE *gp;
+// #ifdef WIN32 gp = _popen("gnuplot -persist", "w");
+// #else gp = popen("gnuplot -persist", "w");
+// #endif if (gp == NULL) return -1;
+//     fprintf(gp, "set isosample 100/n");
+//     fprintf(gp, "min=-1/n");
+//     fprintf(gp, "max=1/n");
+//     fprintf(gp, "pi=3.141592/n");
+//     fprintf(gp, "set hidden3d/n");
+//     fprintf(gp, "set pm3d/n");
+//     fprintf(gp, "set contour/n");
+//     fprintf(gp, "splot [min:max] [min:max] x*x+2*y*y-0.3*cos(3*pi*x)-0.4*cos(4*pi*y)+0.7/n");
+//     fprintf(gp, "pause -1/n");
+// #ifdef WIN32 _pclose(gp);
+// #else pclose(gp);
+// #endif return 0;
+// }
+
 #include <stdio.h>
-int main()
-{
-    FILE *gp;
-#ifdef WIN32 gp = _popen("gnuplot -persist", "w");
-#else gp = popen("gnuplot -persist", "w");
-#endif if (gp == NULL) return -1;
-    fprintf(gp, "set isosample 100/n");
-    fprintf(gp, "min=-1/n");
-    fprintf(gp, "max=1/n");
-    fprintf(gp, "pi=3.141592/n");
-    fprintf(gp, "set hidden3d/n");
-    fprintf(gp, "set pm3d/n");
-    fprintf(gp, "set contour/n");
-    fprintf(gp, "splot [min:max] [min:max] x*x+2*y*y-0.3*cos(3*pi*x)-0.4*cos(4*pi*y)+0.7/n");
-    fprintf(gp, "pause -1/n");
-#ifdef WIN32 _pclose(gp);
-#else pclose(gp);
-#endif return 0;
+
+int main(){
+    FILE *fp = fopen("/home/cqu1/and/Code/data_analys/datalog/savelog_4-27_16-6-45.log", "r");
+    if(fp == NULL){
+        printf("read file failed!\n");
+        perror("read");
+        return 0;
+    }
+    unsigned int k[10000];
+    fread(k, 4, 10000, fp);
+    for(int i = 0; i < 1000; i++){
+        printf("%x, \n", k[i]);
+    }
+    return 0;
 }

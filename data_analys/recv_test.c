@@ -76,7 +76,8 @@ void socket_create()
         close(socket_fd);
         exit(1);
     }
-    for(on = 0; on < sizeof(recv_info);){
+    for (on = 0; on < sizeof(recv_info);)
+    {
         ret = recv(socket_fd, recv_info + on, sizeof(recv_info), 0);
         if (ret != sizeof(recv_info))
         {
@@ -87,7 +88,7 @@ void socket_create()
         }
         on += ret;
     }
-    
+
     recv_id = recv_info[0];
     channel_num = recv_info[1];
     min_channel = recv_info[2];
@@ -115,9 +116,12 @@ void *recv_func()
 
     int recv_num;
     ret = BOARD_NUM / client_num + 1;
-    if(recv_id == client_num - 1){
+    if (recv_id == client_num - 1)
+    {
         recv_num = (BOARD_NUM - (client_num - 1) * ret) * 1024;
-    }else{
+    }
+    else
+    {
         recv_num = ret * 1024;
     }
 
@@ -125,7 +129,8 @@ void *recv_func()
     {
         sem_wait(sem + 0);
         printf("debug: start wait for recving data\n");
-        for(recved_ll = 0; recved_ll < recv_num * 4;){
+        for (recved_ll = 0; recved_ll < recv_num * 4;)
+        {
             ret = recv(socket_fd, (char *)recved_pack + recved_ll, recv_num * 4 - recved_ll, 0);
             if (ret < 0)
             {
@@ -156,7 +161,8 @@ void *recv_func()
         }
         board_num = mark_recv[0];
         end_location = mark_recv[1]; */
-        while(work == 1);
+        while (work == 1)
+            ;
         recv_count++;
         sem_post(sem + 1);
         printf("debug: recv data success: %d\n", recv_count);
@@ -219,7 +225,8 @@ void *example_analys(void *example_me)
         {
             //printf("debug: find 第%d个board>head\n", i);
             start_loca = ex_me->start_address + i * 1024;
-            if(start_loca >= PACK_SIZE - 10){
+            if (start_loca >= PACK_SIZE - 10)
+            {
                 break;
             }
             //printf("debug: get board0 head ret = %d\n", ret);
@@ -248,7 +255,7 @@ void *example_analys(void *example_me)
                     i++;
                     break;
                 }
-                
+
                 ret = find_adc_head(recved_pack + loca, 0);
                 //printf("debug: get adc0 head ret = %d\n", ret);
 
@@ -258,11 +265,12 @@ void *example_analys(void *example_me)
 
                 if (ret == 100 || loca + ret - start_loca >= 1024)
                 {
-                    if(start_loca + 1024 >= PACK_SIZE - 10){
+                    if (start_loca + 1024 >= PACK_SIZE - 10)
+                    {
                         i++;
                         break;
                     }
-                    
+
                     ret = find_board_head(recved_pack + start_loca + 1024, 0);
                     //printf("debug: get board1 head ret = %d\n", ret);
                     if (ret == 100)
@@ -278,7 +286,7 @@ void *example_analys(void *example_me)
                             i++;
                             break;
                         }
-                        
+
                         ret = find_adc_head(recved_pack + loca, 0);
                         //printf("debug: get adc1 head ret = %d, %x\n", ret, *(recved_pack + loca + ret));
                         if (ret == 100)
@@ -330,13 +338,16 @@ void *example_analys(void *example_me)
             if (channel_num > 4)
             {
                 // valid_num = get_timestamp(valid_time, list_adc[0], adc_count[0], list_adc[7], adc_count[7]);
-                if(adc_count[0] > adc_count[7]){
-                    adc_count[0] = adc_count [7];
+                if (adc_count[0] > adc_count[7])
+                {
+                    adc_count[0] = adc_count[7];
                 }
                 n = 0;
                 valid_num = 0;
-                for(m = 0; m < adc_count[0];){
-                    if(abs((list_adc[0] + m)->m_timestamp - (list_adc[7] + n)->m_timestamp) < DELAY_MAX){
+                for (m = 0; m < adc_count[0];)
+                {
+                    if (abs((list_adc[0] + m)->m_timestamp - (list_adc[7] + n)->m_timestamp) < DELAY_MAX)
+                    {
                         *(valid_time + valid_num) = (list_adc[0] + m)->m_timestamp;
                         valid_num++;
                         m++;
@@ -346,17 +357,20 @@ void *example_analys(void *example_me)
                             break;
                         }
                     }
-                    else if ((list_adc[0] + m)->m_timestamp > (list_adc[7] + n)->m_timestamp){
+                    else if ((list_adc[0] + m)->m_timestamp > (list_adc[7] + n)->m_timestamp)
+                    {
                         m++;
-                    }else
+                    }
+                    else
                     {
                         n++;
-                        if(n == adc_count[7]){
+                        if (n == adc_count[7])
+                        {
                             break;
                         }
                     }
                 }
-                
+
                 //debug
                 // for(int y = 0; y < valid_num; y++){
                 //     printf("debug: %dtimestamp = %lld\n", y, valid_time[y]);
@@ -370,8 +384,22 @@ void *example_analys(void *example_me)
                 valid_num = get_timestamp(valid_time, list_adc[min_channel], adc_count[min_channel], list_adc[min_channel], adc_count[min_channel]);
             }
 
-            for(int c = 0; c < min_channel + channel_num; c++){
-                if(adc_count[c] < valid_num){
+            //debug 
+            // for(int b = 0; b < valid_num; b++){
+            //     printf("%lld, %lld\n", valid_time[b], valid_time[b + 1] - valid_time[b]);
+            // }
+            for(int c = 0; c < 8; c++){
+                for(int b = 0; b < adc_count[c]; b++){
+                    printf("channel: %d, timestamp[%d]: %lld\n", c, b, (list_adc[c] + b)->m_timestamp);
+                }
+            }
+            work = 1;
+            while(work == 1);
+
+            for (int c = 0; c < min_channel + channel_num; c++)
+            {
+                if (adc_count[c] < valid_num)
+                {
                     valid_num = adc_count[c];
                 }
             }
@@ -428,7 +456,7 @@ void *example_analys(void *example_me)
                     value = valid_example_count << 16;
                     valid_example_count++;
                     value = value | loca;
-                    
+
                     fwrite(&value, 4, 1, log_save);
                     for (int c = min_channel; c < min_channel + channel_num; c++)
                     {
@@ -484,7 +512,8 @@ void *data_analys()
         recv_num = board_num;
 
         //debug
-        for(int i = 0; i < 1; i++){
+        for (int i = 0; i < 1; i++)
+        {
 
             start_num = i * recv_num;
 
@@ -509,7 +538,7 @@ void *data_analys()
         sem_wait(sem + 1);
         //sem_wait(sem + 1);
         //sem_wait(sem + 1);
-        
+
         //printf("debug: analys end\n");
         //debug
         //exit(1);
@@ -562,6 +591,11 @@ int main()
         {
         case 'w':
             work = 1;
+            break;
+
+        case 'c':
+            work = 0;
+            break;
 
         default:
             break;
