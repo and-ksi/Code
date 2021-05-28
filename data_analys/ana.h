@@ -542,7 +542,7 @@ double cal_position(unsigned int *s1, unsigned int *s2)
     long long t2 = bit_time_read(s2);
 
     return ((double)(t1 - t2) *
-            (double)(SIZE_EVERY_INTERVAL / (2 * DELAY_EVERY_INTERVAL)));
+            (double)(SIZE_EVERY_INTERVAL / (2 * DELAY_EVERY_INTERVAL) * 1e-3));
 }
 
 //calculate kinetic energy
@@ -556,15 +556,16 @@ double cal_energy(unsigned int **_in)
     {
         s[i] = cal_position(*(_in + 2 * i), *(_in + 2 * i + 1));
     }
+    int length_ = pow((s[0] - s[2]) * (s[0] - s[2]) + (s[1] - s[4]) * (s[1] - s[3]) + .25 * .25 , 1./3);
     long long t[8];
     for (int i = 0; i < 8; i++)
     {
-        t[i] = bit_head_read(*(_in + i), 't');
+        t[i] = cfd_get_begintime(*(_in + i));
     }
     double arrive_time[2];
-    arrive_time[0] = ((t[0] + t[1]) - INTERVAL_NUM * DELAY_EVERY_INTERVAL - 2 * ((SQRT_SIZE / 2 - s[1]) * DELAY_EVERY_INTERVAL / SIZE_EVERY_INTERVAL)) / 2;
-    arrive_time[1] = ((t[4] + t[5]) - INTERVAL_NUM * DELAY_EVERY_INTERVAL - 2 * ((SQRT_SIZE / 2 - s[3]) * DELAY_EVERY_INTERVAL / SIZE_EVERY_INTERVAL)) / 2;
-    double vv = .25 / (abs(arrive_time[0] - arrive_time[1]) * 1e-9);
+    arrive_time[0] = (t[0] + t[1] + t[2] + t[3]) / 4;
+    arrive_time[1] = (t[4] + t[5] + t[6] + t[7]) / 4;
+    double vv = length_ / (abs(arrive_time[0] - arrive_time[1]) * 1e-9);
     return ENERGY_OF_MOUN * vv * vv;
 }
 
