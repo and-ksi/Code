@@ -210,7 +210,7 @@ long long bit_time_read(unsigned int *in_)
     //long long ret = *(in_ + 1);
     //return ((ret << 32) | *(in_ + 2));
 
-    long long ret = 0, ret1, ret2;
+    long long ret = 0, ret1, ret2, ret3;
     int i, n = 0;
     for(i = 1;; i++){
         ret1 = ((*(in_ + i) & 0xffff0000) >> 16);
@@ -226,12 +226,15 @@ long long bit_time_read(unsigned int *in_)
             break;
         }
     }
-    if(n & 1){
-        ret = ((long long)ret2 << 48);
-        ret = ret | ((long long)(*(in_ + i + 1)) << 16);
-        return ret = ret | ((*in_ + i + 2) >> 16);
+    if(n & 1 == 1){
+        ret = (ret2 << 48);
+        ret1 = *(in_ + i + 1);
+        ret2 = ((*(in_ + i + 2) & 0xffff0000) >> 16);
+        ret = (ret | (ret1 << 16) | ret2);
+        return ret;
     }else{
-        ret = ((long long)(*(in_ + i)) << 32);
+        ret1 = *(in_ + i);
+        ret = (ret1 << 32);
         return ret = ret | (*(in_ + i + 1));
     }
     /* ret = *(in_ + 1);
