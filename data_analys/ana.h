@@ -493,11 +493,7 @@ int find_adc_head(unsigned int *in_, int k){
     int ret, ret1;
     int i;
     for(i = 0; i < 10; i++){
-        // ret = (*(in_ + i) << 16 >> 24) - 0x3f;
-        // ret1 = (*(in_ + i + 1) << 16 >> 24) - 0x3f;
-        // printf("i :%d, ret: %x, ret1: %x aaaaa\n", i, ret, ret1);
-        // if (ret == 0 && ret1 != 0)
-        //printf("debug: find_adc_head: ret = %d formal: %x  value: %d\n", i, *(in_ + i), ((*(in_ + i) & 0x0000ff00) == 0x00003f00));
+        //printf("debug: %x  %x\n", (*(in_ + i) & 0x0000fff0), (*(in_ + i + 1) & 0x0000fff0));
         if ((*(in_ + i) & 0x0000fff0) == 0x00003f00 && (*(in_ + i + 1) & 0x0000fff0) != 0x00003f00)
         {
             //printf("debug: find_adc_head: ret = %d\n", i);
