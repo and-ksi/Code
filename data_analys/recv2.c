@@ -167,7 +167,7 @@ void *data_analys(id)
     //debug
     for (int i = 0; i < 1; i++)
     {
-        ptd_create(ana_ptd + i, i + 1, example_analys, _me + i, 0);
+        //ptd_create(ana_ptd + i, i + 1, example_analys, _me + i, 0);
     }
 
     while (work != -1)
@@ -176,7 +176,7 @@ void *data_analys(id)
         sem_wait(sem + 1);
         //printf("debug: data_analys start\n");
 
-        ret = find_board_head(recved_pack + PACK_SIZE - 1024, 0);
+        ret = find_board_head(recved_pack + PACK_SIZE - 1024, 0, 0);
         if (ret == 100)
         {
             fprintf(error_fp, "cant find the last board! recv_count:%d\n", recv_count);
@@ -193,7 +193,7 @@ void *data_analys(id)
 
             start_num = i * recv_num;
 
-            start_address = start_num * 1024 + find_board_head(recved_pack + start_num * 1024, 0);
+            start_address = start_num * 1024 + find_board_head(recved_pack + start_num * 1024, 0, 0);
             //printf("debug: start_address: %d\n", start_address);
             (_me + i)->start_address = start_address;
             if (i == 2)

@@ -241,6 +241,64 @@ long long bit_time_read(unsigned int *in_)
     return (*(in_ + 2) | (ret << 32)); */
 }
 
+int find_board_head(unsigned int *in_, int k, int len)
+{
+    if (len == 0)
+    {
+        len = 10;
+    }
+    for (int i = 0; i < len; i++)
+    {
+        if (*(in_ + i) == 0xf00f)
+        {
+            //printf("debug: find_board_head: ret = %d\n", i);
+            return i;
+        }
+        if (k)
+        {
+            if (*(in_ - i) == 0xf00f)
+            {
+                return -i;
+            }
+        }
+        if (*(in_ + i) == 0)
+        {
+            return 100;
+        }
+    }
+    return 100;
+}
+
+int find_adc_head(unsigned int *in_, int k, int len)
+{
+    if (len == 0)
+    {
+        len = 10;
+    }
+    int ret, ret1;
+    int i;
+    for (i = 0; i < len; i++)
+    {
+        //printf("debug: %x  %x, %x  %x  %x  %x   %x  %x\n", (*(in_ + i) & 0x0000fff0), (*(in_ + i + 1) & 0x0000fff0), *(in_ + i - 2), *(in_ + i - 1), *(in_ + i), *(in_ + i + 1), *(in_ + i + 2), *(in_ + i + 3));
+        if ((*(in_ + i) & 0x0000fff0) == 0x00003f00 && (*(in_ + i + 1) & 0x0000fff0) != 0x00003f00)
+        {
+            //printf("debug: find_adc_head: ret = %d\n", i);
+            if ((*(in_ + i) & 0x000000ff) <= 8 && (*(in_ + i) >> 16) < 100)
+            {
+                return i;
+            }
+        }
+        if ((*(in_ - i) & 0x0000fff0) == 0x00003f00 && (*(in_ - i + 1) & 0x0000fff0) != 0x00003f00)
+        {
+            if ((*(in_ - i) & 0x000000ff) <= 8 && (*(in_ - i) >> 16) < 100)
+            {
+                return -i;
+            }
+        }
+    }
+    return 100;
+}
+
 unsigned int bit_head_read(unsigned int *in_, char sig_0)
 {
     if (in_ == NULL)
@@ -284,15 +342,13 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0)
         break;
 
     case 'l':
-        if ((*in_ >> 16) < 5)
+        if ((*in_ >> 16) < 20)
         {
-            for (int i = 5; i < 1024; i++)
-            {
-                if (*(in_ + i) & 0x0fff0000 == 0 || *(in_ + i) & 0x00000fff == 0)
-                {
-                    return i - 1;
-                }
+            ret = find_adc_head(in_ + 20, 0, 50);
+            if(ret == 100){
+                return 0;
             }
+            return (20 + ret);
         }
         else
         {
@@ -469,47 +525,6 @@ void *open_savelog(int num){
     printf("debug: open savelog success!\n");
     fwrite(&num, 4, 1, _log_save);
     return _log_save;
-}
-
-int find_board_head(unsigned int *in_, int k){
-    for(int i = 0; i < 10; i++){
-        if(*(in_ + i) == 0xf00f){
-            //printf("debug: find_board_head: ret = %d\n", i);
-            return i;
-        }
-        if(k){
-            if(*(in_ - i) == 0xf00f){
-                return -i;
-            }
-        }
-        if(*(in_ + i) == 0){
-            return 100;
-        }
-    }
-    return 100;
-}
-
-int find_adc_head(unsigned int *in_, int k){
-    int ret, ret1;
-    int i;
-    for(i = 0; i < 10; i++){
-        //printf("debug: %x  %x\n", (*(in_ + i) & 0x0000fff0), (*(in_ + i + 1) & 0x0000fff0));
-        if ((*(in_ + i) & 0x0000fff0) == 0x00003f00 && (*(in_ + i + 1) & 0x0000fff0) != 0x00003f00)
-        {
-            //printf("debug: find_adc_head: ret = %d\n", i);
-            if(bit_head_read(in_ + i, 'c') < 8 && bit_head_read(in_ + i, 'l') < 100){
-                return i;
-            }
-        }
-       if ((*(in_ - i) & 0x0000fff0) == 0x00003f00 && (*(in_ - i + 1) & 0x0000fff0) != 0x00003f00)
-        {
-            if(bit_head_read(in_ - i, 'c') < 8 && bit_head_read(in_ - i, 'l') < 100){
-                return -i;
-            }
-        }
-        
-    }
-    return 100;
 }
 
 //if(*(in_ + i) & 0x00003f00 == 0x00003f00 && *(in_ + i + 1) & 0x00003f00 != 0x00003f00)

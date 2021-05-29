@@ -56,7 +56,7 @@ void sort_data(){
     FILE *fp[8];
 
     for(int board_count = 0; board_count < 2560; board_count++){
-        ret = find_board_head(recved_pack + board_count * 1024, 0);
+        ret = find_board_head(recved_pack + board_count * 1024, 0, 0);
         if(ret == 100){
             printf("can not find board head\n");
             continue;
@@ -71,7 +71,7 @@ void sort_data(){
                 printf("loca error: loca = %d\n", loca);
                 break;
             }
-            ret = find_adc_head(recved_pack + loca, 0);
+            ret = find_adc_head(recved_pack + loca, 0, 0);
             if(ret == 100){
                 printf("can not find adc head\n");
                 break;
