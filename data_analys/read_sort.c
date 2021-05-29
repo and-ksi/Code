@@ -19,9 +19,11 @@ int recv_count;
 
 unsigned int recved_pack[PACK_SIZE];
 
+LOCA_TIME list_adc[8][2560 / 8 * 50];
+
 void debug_data_read()
 {
-    FILE *co_fp = fopen("log_save/correct_data_with_delay.log", "r");
+    FILE *co_fp = fopen("log_save/correct_data_withddddcccc.log", "r");
     if (co_fp == NULL)
     {
         printf("open debug data failed!\n");
@@ -42,12 +44,12 @@ void debug_data_read()
 }
 
 void sort_data(){
-    LOCA_TIME (*list_adc)[8] = (LOCA_TIME (*)[8])malloc(sizeof(LOCA_TIME) * 50 * 2200);
+    //LOCA_TIME (*list_adc)[8] = (LOCA_TIME (*)[8])malloc(sizeof(LOCA_TIME) * 50 * 2200);
     if(list_adc == NULL){
         printf("create list_adc failed!\n");
         exit(1);
     }
-    memset(list_adc, 0, sizeof(LOCA_TIME) * 50 * 2200);
+    memset(list_adc, 0, sizeof(list_adc));
 
     int loca = 0, start_loca, ret;
     int _channel, adc_count[8] = {0};
@@ -106,30 +108,22 @@ void sort_data(){
         }
     }
 
-    for(int c = 0; c < 8; c++){
-        sprintf(buf, "channel_%d.log", c + 1);
-        fp[c] = fopen(buf, "w+");
-        if(fp == NULL){
-            printf("%s open failed!\n", buf);
-            exit(1);
-        }
-        for(int i = 0; i < adc_count[c]; i++){
-            fprintf(fp[c], "%d :   channel = %d    timestamp = %llx, loca = %d      %x, %x ,%x, %x, %x\n", i, c, list_adc[c][i].m_timestamp, list_adc[c][i].m_location, recved_pack[list_adc[c][i].m_location - 2], recved_pack[list_adc[c][i].m_location - 1], recved_pack[list_adc[c][i].m_location], recved_pack[list_adc[c][i].m_location + 1], recved_pack[list_adc[c][i].m_location + 2]);
-        }
-        fclose(fp[c]);
-    }
-    free(list_adc);
-    // sprintf(buf, "total.log");
-    // fp = fopen(buf, "w+");
-    // if (fp == NULL)
-    // {
-    //     printf("%s open failed!\n", buf);
-    //     exit(1);
+    // for(int c = 0; c < 8; c++){
+    //     sprintf(buf, "channel_%d.log", c + 1);
+    //     fp[c] = fopen(buf, "w+");
+    //     if(fp == NULL){
+    //         printf("%s open failed!\n", buf);
+    //         exit(1);
+    //     }
+    //     for(int i = 0; i < adc_count[c]; i++){
+    //         fprintf(fp[c], "%d :   channel = %d    timestamp = %llx, loca = %d      %x, %x ,%x, %x, %x\n", i, c, list_adc[c][i].m_timestamp, list_adc[c][i].m_location, recved_pack[list_adc[c][i].m_location - 2], recved_pack[list_adc[c][i].m_location - 1], recved_pack[list_adc[c][i].m_location], recved_pack[list_adc[c][i].m_location + 1], recved_pack[list_adc[c][i].m_location + 2]);
+    //     }
+    //     fclose(fp[c]);
     // }
-    // int defference[7];
-    // for(int c = 0; c < 7; c++){
+}
 
-    // }
+void save_data(){
+    
 }
 
 int main(){
