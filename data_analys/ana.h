@@ -502,29 +502,29 @@ void write_data_error_log(FILE **_fp, unsigned int *edata, int count, int m_mark
     //fclose(_fp);
 }
 
-void *open_savelog(int num){
+void *open_savelog(){
     if (NULL == opendir("datalog"))
     {
         mkdir("datalog", 0777);
     }
 
     char buf[100];
-    FILE *_log_save;
+    FILE *save;
 
     time_t t;
     struct tm *lt;
     time(&t);           //获取Unix时间戳。
     lt = localtime(&t); //转为时间结构。
     sprintf(buf, "datalog/savelog_%d-%d_%d-%d-%d.log", lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
-    _log_save = fopen(buf, "w+");
-    if (_log_save == NULL)
+    save = fopen(buf, "w+");
+    if (save == NULL)
     {
         printf("Log_save create failed!\n");
         exit(1);
     }
     printf("debug: open savelog success!\n");
-    fwrite(&num, 4, 1, _log_save);
-    return _log_save;
+
+    return save;
 }
 
 //if(*(in_ + i) & 0x00003f00 == 0x00003f00 && *(in_ + i + 1) & 0x00003f00 != 0x00003f00)
@@ -533,8 +533,25 @@ void take_head_to_struct(void *m_struct_, unsigned int *in_){
 
 }
 
-
-
+int get_latest_data(LOCA_TIME *m_list, long long time, int acount)
+{
+    int def[3];
+    def[0] = abs((m_list + 0)->m_timestamp - time);
+    def[1] = abs((m_list + 1)->m_timestamp - time);
+    def[2] = abs((m_list + 2)->m_timestamp - time);
+    if (def[1] >= def[0] && def[2] >= def[1])
+    {
+        return -1;
+    }
+    for (int i = 1; i < acount; i++)
+    {
+        def[i] = abs((m_list + i)->m_timestamp - time);
+        if (def[i - 1] <= def[i])
+        {
+            return i - 1;
+        }
+    }
+}
 
 //2500MHz时,延迟时间50次,20ns
 //20MHz,延迟时间?
