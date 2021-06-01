@@ -344,11 +344,12 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0)
     case 'l':
         if ((*in_ >> 16) < 20)
         {
-            ret = find_adc_head(in_ + 20, 0, 50);
-            if(ret == 100){
-                return 0;
+            for(int i = 2; i < 100; i++){
+                if(*(in_ + i) == 0xddddcccc){
+                    return i - 1;
+                }
             }
-            return (20 + ret);
+            return 100;
         }
         else
         {
@@ -535,7 +536,7 @@ void take_head_to_struct(void *m_struct_, unsigned int *in_){
 
 int get_latest_data(LOCA_TIME *m_list, long long time, int acount)
 {
-    int def[3];
+    int def[10];
     def[0] = abs((m_list + 0)->m_timestamp - time);
     def[1] = abs((m_list + 1)->m_timestamp - time);
     def[2] = abs((m_list + 2)->m_timestamp - time);
@@ -543,7 +544,7 @@ int get_latest_data(LOCA_TIME *m_list, long long time, int acount)
     {
         return -1;
     }
-    for (int i = 1; i < acount; i++)
+    for (int i = 1; i < 10; i++)
     {
         def[i] = abs((m_list + i)->m_timestamp - time);
         if (def[i - 1] <= def[i])
@@ -551,6 +552,7 @@ int get_latest_data(LOCA_TIME *m_list, long long time, int acount)
             return i - 1;
         }
     }
+    return -1;
 }
 
 //2500MHz时,延迟时间50次,20ns

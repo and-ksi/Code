@@ -117,7 +117,6 @@ void *recv_func()
     int recved_ll;
     recv_count = 0;
 
-    
     ret = BOARD_NUM / client_num + 1;
     if (recv_id == client_num - 1)
     {
@@ -159,7 +158,7 @@ void *recv_func()
 void sort_data()
 {
     //debug
-    write_data_error_log(&error_fp, recved_pack, PACK_SIZE, 0);
+    //write_data_error_log(&error_fp, recved_pack, PACK_SIZE, 0);
 
     memset(list_adc, 0, sizeof(list_adc));
 
@@ -208,7 +207,8 @@ void sort_data()
             list_adc[_channel][adc_count[_channel]].m_timestamp = bit_time_read(recved_pack + loca);
             list_adc[_channel][adc_count[_channel]].m_length = bit_head_read(recved_pack + loca, 'l');
             printf("debug: length = %d\n", list_adc[_channel][adc_count[_channel]].m_length);
-            if(list_adc[_channel][adc_count[_channel]].m_length + loca >= PACK_SIZE){
+            if (list_adc[_channel][adc_count[_channel]].m_length + loca >= PACK_SIZE)
+            {
                 break;
             }
 
@@ -228,10 +228,15 @@ void sort_data()
                 }
             }
             adc_count[_channel]++;
-            if(adc_count[_channel] == 16000){
+            if (adc_count[_channel] == 16000)
+            {
                 break;
             }
         }
+    }
+
+    for(int c = 0; c < 8; c++){
+        printf("channel = %d, adc_count = %d\n", c + 1, adc_count[c]);
     }
 
     // for(int c = 0; c < 8; c++){
@@ -249,7 +254,8 @@ void sort_data()
     //exit(1);
 }
 
-void save_data1(){
+void save_data1()
+{
     if (log_save == NULL || valid_example_count == 0xffff)
     {
         if (log_save == NULL)
@@ -265,10 +271,12 @@ void save_data1(){
             //fwrite(&file_count, 4, 1, log_save);
         }
     }
-    for(int c = 0; c < 8; c++){
+    for (int c = 0; c < 8; c++)
+    {
         fprintf(log_save, "channel = %d\n", c + 1);
-        for(int i = 0; i < adc_count[c]; i++){
-            
+        for (int i = 0; i < adc_count[c]; i++)
+        {
+
             fprintf(log_save, "%d :   channel = %d    timestamp = %llx, loca = %d      %x, %x ,%x, %x, %x\n", i, c + 1, list_adc[c][i].m_timestamp, list_adc[c][i].m_location, recved_pack[list_adc[c][i].m_location - 2], recved_pack[list_adc[c][i].m_location - 1], recved_pack[list_adc[c][i].m_location], recved_pack[list_adc[c][i].m_location + 1], recved_pack[list_adc[c][i].m_location + 2]);
         }
         fflush(log_save);
@@ -276,7 +284,8 @@ void save_data1(){
     exit(1);
 }
 
-void save_data(){
+void save_data()
+{
     if (log_save == NULL || valid_example_count == 0xffff)
     {
         if (log_save == NULL)
@@ -295,11 +304,13 @@ void save_data(){
 
     int ret, addr[8] = {0}, _channel, defference, value, length;
 
-    for(addr[7] = 0; addr[7] < adc_count[7]; addr[7]++){
+    for (addr[7] = 0; addr[7] < adc_count[7]; addr[7]++)
+    {
         _channel = 6;
         ret = get_latest_data(list_adc[_channel] + addr[_channel], (list_adc[7] + addr[7])->m_timestamp, adc_count[_channel] - addr[_channel]);
         printf("debug: 0 channel = %d, ret = %d\n", _channel, ret);
-        if(ret >= 0){
+        if (ret >= 0)
+        {
             addr[6] += ret;
 
             defference = abs(list_adc[_channel][addr[_channel]].m_timestamp - list_adc[7][addr[7]].m_timestamp);
@@ -308,42 +319,52 @@ void save_data(){
             {
                 continue;
             }
-            for(_channel = 5; _channel > 3; _channel--){
+            for (_channel = 5; _channel > 3; _channel--)
+            {
 
                 ret = get_latest_data(list_adc[_channel] + addr[_channel], (list_adc[7] + addr[7])->m_timestamp, adc_count[_channel] - addr[_channel]);
                 printf("debug: 1 channel = %d, ret = %d\n", _channel, ret);
-                if(ret >= 0){
+                if (ret >= 0)
+                {
                     addr[_channel] += ret;
-                    if(abs(list_adc[_channel][addr[_channel]].m_timestamp - list_adc[7][addr[7]].m_timestamp) > defference + 5){
+                    if (abs(list_adc[_channel][addr[_channel]].m_timestamp - list_adc[7][addr[7]].m_timestamp) > defference + 5)
+                    {
                         break;
                     }
                 }
             }
             ret = get_latest_data(list_adc[_channel] + addr[_channel], (list_adc[7] + addr[7])->m_timestamp, adc_count[_channel] - addr[_channel]);
             printf("debug: 1 channel = %d, ret = %d\n", _channel, ret);
-            if(ret >= 0){
+            if (ret >= 0)
+            {
                 addr[_channel] += ret;
                 defference = abs(list_adc[_channel][addr[_channel]].m_timestamp - list_adc[7][addr[7]].m_timestamp);
                 printf("debug: 2 defference = %d\n", defference);
-                if(defference >= 7){
+                if (defference >= 7)
+                {
                     continue;
                 }
-                for(_channel = 3; _channel >= 0; _channel--){
+                for (_channel = 3; _channel >= 0; _channel--)
+                {
                     ret = get_latest_data(list_adc[_channel] + addr[_channel], (list_adc[7] + addr[7])->m_timestamp, adc_count[_channel] - addr[_channel]);
                     printf("debug: 2 channel = %d, ret = %d\n", _channel, ret);
-                    if(ret >= 0){
+                    if (ret >= 0)
+                    {
                         addr[_channel] += ret;
-                        if(abs(list_adc[_channel][addr[_channel]].m_timestamp - list_adc[7][addr[7]].m_timestamp) > defference + 5){
+                        if (abs(list_adc[_channel][addr[_channel]].m_timestamp - list_adc[7][addr[7]].m_timestamp) > defference + 5)
+                        {
                             break;
                         }
                     }
                 }
             }
         }
-        if(_channel == 0){
+        if (_channel == 0)
+        {
             length = 0;
             value = valid_example_count << 16;
-            for(int c = 0; c < 8; c++){
+            for (int c = 0; c < 8; c++)
+            {
                 length += (list_adc[c] + addr[c])->m_length;
             }
             value = length | value;
@@ -368,7 +389,7 @@ void *data_analys(int id)
         sem_wait(sem + 1);
 
         sort_data();
-        save_data1();
+        //save_data1();
 
         memset(recved_pack, 0, sizeof(recved_pack));
         sem_post(sem + 0);
