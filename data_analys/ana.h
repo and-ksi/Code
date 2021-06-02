@@ -50,6 +50,9 @@
 #define FREQUENCY (125)          //MHz
 #define PERIOD_CYCLE (8)         //ns    ^^^^^   与频率相关联
 
+#define PRO_FREQUENCY (0.2)      //MHz
+#define PRO_PERIOD_CYCLE (5000 / 8 - 100)
+
 #define ATTENUATION_COEFFICIENT (1.04)
 #define DELAY_TIME (500)   //ns   恒比定时延迟时间
 #define DELAY_MAX (8 * 50) //判断数据有效,上下正比室触发时间最大差值 \
@@ -64,6 +67,13 @@ typedef struct location_timestamp
     int m_length;
     int m_channel;
 }LOCA_TIME;
+
+typedef struct speed_time{
+    long *count;
+    int *speed;
+    int size;//kB
+    FILE **m_fp;
+}SPEED_T;
 
 //根据CPU创建和分配线程
 void ptd_create(pthread_t *arg, int k, void *functionbody, void *m_arg, int m)
@@ -114,34 +124,32 @@ void ptd_create(pthread_t *arg, int k, void *functionbody, void *m_arg, int m)
 }
 
 //speed test pthread
-void *speed_test(void *count, char *order)
+void *speed_test(void *ml)
 {
-    long *__cnt = (long *)count; //注释掉,使用global identifier代替
+    SPEED_T *speed_t = (SPEED_T *)ml;
+    long *__cnt = speed_t->count; //注释掉,使用global identifier代替
     struct timeval systime;
     long time0, time1, time2 = 0, cnt1 = 0;
     double speed0, speed1;
-    int size_of_every_time = 1024; //1024kB
+    int size_of_every_time = speed_t->size / 1024; //1024kB
     gettimeofday(&systime, 0);
-    time0 = systime.tv_sec * 1e6 + systime.tv_usec;
+    time0 = time2 = systime.tv_sec;
     while (1)
     {
         gettimeofday(&systime, 0);
-        time1 = systime.tv_sec * 1e6 + systime.tv_usec - time0;
-        while (time1 - time2 > 1)
+        time1 = systime.tv_sec;
+        if (time1 - time2 > 1)
         {
-            if (*order != 'n')
-            {
-                //calculate every second
-                //speed in one seconds
-                speed0 = (double)(*__cnt - cnt1) /
-                         (double)((time1 - time2) * 1e6 * size_of_every_time);
-                //total average speed
-                speed1 = (double)(*__cnt) / (double)(time1 * 1e6 * size_of_every_time);
-                printf("Average speed: %lfMB/s, second speed: %lfMB/s\n",
-                       speed0, speed1);
-            }
+            //calculate every second
+            //speed in one seconds
+            *(speed_t->speed + 0) = (double)(*__cnt - cnt1) /
+                                    (double)((time1 - time2) * 1e6 * size_of_every_time);
+            //total average speed
+            *(speed_t->speed + 1) = (double)(*__cnt) / (double)(time1 * 1e6 * size_of_every_time);
             time2 = time1;
             cnt1 = *__cnt;
+            //fprintf(*(speed_t->m_fp), "speed now = %d   speed average = %d\n", *(speed_t->speed + 0), *(speed_t->speed + 1));
+            printf("speed now = %d   speed average = %d\n", *(speed_t->speed + 0), *(speed_t->speed + 1));
         }
     }
 }
@@ -226,6 +234,13 @@ long long bit_time_read(unsigned int *in_)
             break;
         }
     }
+
+    if((*(in_ + i + 1) & 0xffff0000) == 0){
+        ret1 = *(in_ + i);
+        ret2 = *(in_ + i + 2);
+        return ((ret1 << 32) | ret2);
+    }
+
     if(n & 1 == 1){
         ret = (ret2 << 48);
         ret1 = *(in_ + i + 1);
@@ -540,10 +555,6 @@ int get_latest_data(LOCA_TIME *m_list, long long time, int acount)
     def[0] = abs((m_list + 0)->m_timestamp - time);
     def[1] = abs((m_list + 1)->m_timestamp - time);
     def[2] = abs((m_list + 2)->m_timestamp - time);
-    if (def[1] >= def[0] && def[2] >= def[1])
-    {
-        return -1;
-    }
     for (int i = 1; i < 10; i++)
     {
         def[i] = abs((m_list + i)->m_timestamp - time);
