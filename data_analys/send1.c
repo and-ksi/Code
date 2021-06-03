@@ -265,7 +265,7 @@ int main(int argc, char const *argv[])
             break;
 
         default:
-            printf("port, client_num, channel_num, min_channel\n");
+            printf("port client_num channel_num min_channel\n");
             scanf("%d %d %d %d", &port, &client_num, &channel_num, &min_channel);
             break;
         }
