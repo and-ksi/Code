@@ -1,7 +1,7 @@
 #include "ana.h"
 
 //需要被初始化以及随环境改变的参数
-int client_num = 1;
+int client_num = 2;
 int channel_num = 8;
 int min_channel = 1;
 int port = 10000;
@@ -185,8 +185,7 @@ void *data_part_send()
     int ret;
     int send_num;
 
-    //int board_location[1024];
-    int board_num, send_ll;
+    int board_num, send_ll, send_length;
     int mark_send[2];
 
     socket_count = 0;
@@ -194,41 +193,14 @@ void *data_part_send()
     while (work != -1)
     {
         board_num = BOARD_NUM;
+        send_length = 0;
         sem_wait(sem + 2);
         printf("debug: start part and send data\n");
-        /* 
-        //debug
-        board_location[0] = find_board_head(pData, 0);
-        for(board_num = 0; board_num < 1300; board_num++){
-            printf("debug: 0here's no bug !\n");
-            location = find_board_head(pData + board_location[board_num], 0);
-            if(location == 100){
-                board_location[board_num] = 0;
-                //board_num--;
-                break;
-            }
-            board_location[board_num] +=  location;
-            write_data_error_log(&error_fp, pData + board_location[board_num], 1030, 1);
-            exit(1);
-            write_error_log(&error_fp, pData + board_location[board_num], 1);
-            board_location[board_num + 1] = board_location[board_num] + 1024;
-            printf("debug: 1here's no bug !\n");
-        } 
-        location = board_num / client_num + 1;
-        exit(1); */
 
-        ret = find_board_head(pData + BOARD_NUM * 1024 - 1024, 0);
-        if (ret == 100)
-        {
-            fprintf(error_fp, "cant find the last board! recv_count:%d\n", socket_count);
-            write_data_error_log(&error_fp, pData, PACK_SIZE, 0);
-            break;
-        }
-        printf("debug: 1 find the last board success!\n");
-
-        ret = board_num / client_num + 1;
+        
         for (int i = 1; i <= client_num; i++)
         {
+            ret = board_num / client_num + 1;
             if (i == client_num)
             {
                 send_num = (BOARD_NUM - (i - 1) * ret) * 1024;
@@ -236,16 +208,27 @@ void *data_part_send()
                 send_num = ret * 1024;
             }
 
+            ret = find_board_head(pData + send_num - 1024, 0, 0);
+            if (ret == 100)
+            {
+                fprintf(error_fp, "cant find the last board! recv_count:%d\n", socket_count);
+                write_data_error_log(&error_fp, pData, PACK_SIZE, 0);
+                break;
+            }
+            printf("debug: 1 find the last board success!\n");
+
             //debug
             // write_data_error_log(&error_fp, pData + start_address, end_address - start_address, 0);
             // exit(1);
             printf("debug: send_num: %d\n", send_num);
 
             for(send_ll = 0; send_ll < send_num * 4;){
-                ret = send(acfd[i - 1], (char *)pData + (i - 1) * ret * 1024 * 4 + send_ll, send_num * 4 - send_ll, 0);
+                ret = send(acfd[i - 1], (char *)pData + (send_length) * 4 + send_ll, send_num * 4 - send_ll, 0);
+                printf("debug: send ret = %d\n", ret);
                 if (ret < 0)
                 {
                     printf("Data send failed! socket_count: %d, send_ll: %d\n", socket_count, send_ll);
+                    perror("send failed!");
                     fprintf(error_fp, "\nData send failed! socket_count: %d, send_ll: %d\n", socket_count, send_ll);
                     write_data_error_log(&error_fp, pData, PACK_SIZE, 0);
                     exit(1);
@@ -253,28 +236,23 @@ void *data_part_send()
                 send_ll += ret;
             }
 
-            printf("debug: 第%d次发送: to %d client. board_num: %d\n", socket_count, i, board_num);
-
-            /*             mark_send[0] = end_address - (i - 1) * location + 1;
-            mark_send[1] = 4 * (board_location[end_address] - board_location[(i - 1) * location]);
-            ret = send(acfd[i], mark_send, sizeof(mark_send), 0);
-            if(ret < 0){
-                printf("Mark_send send failed! : %d, %d\n", mark_send[0], mark_send[1]);
-                fprintf(error_fp, "\nMark_send send failed! : %d, %d\n", mark_send[0], mark_send[1]);
-                exit(1);
-            } */
+            printf("debug: 第%d次发送: to %d client. board_num: %d\n", socket_count, i, send_num / 1024);
+            send_length += send_num - 1024;
         }
+        while (work == 1);
+
         memset(pData, 0, sizeof(pData));
         sem_post(sem + 0);
         socket_count++;
         memset(mark_send, 0, sizeof(mark_send));
         printf("debug: send success: %d\n", socket_count);
+
     }
 }
 
 int main(int argc, char const *argv[])
 {
-    char sig = 'y';
+    char sig;
     error_fp = open_error_log();
     fprintf(error_fp, "This is send.c error.log!\n");
     while (sig != 'y')
@@ -304,7 +282,7 @@ int main(int argc, char const *argv[])
     sem_init(&sem[1], 0, 0);
     sem_init(&sem[2], 0, 0);
 
-    work = 1;
+    work = 0;
 
     pthread_t rx_thread, event_thread;
     pthread_t part_send_thread;
@@ -322,14 +300,17 @@ int main(int argc, char const *argv[])
         switch (sig)
         {
         case 'w':
-            lseek(c2h_fd[0], 0, SEEK_SET);
-            read(c2h_fd[0], pData, 4 * 1024);
-            printf("Read data successful!\n");
+            work = 1;
+            sleep(1);
+            write_data_error_log(&error_fp, pData, PACK_SIZE, 0);
+            break;
 
-            for (int i = 0; i < 1024; i++)
-            {
-                printf("The data of address %d is %x \n", i, pData[i]);
-            }
+        case 'p':
+            work = 1;
+            break;
+
+        case 'c':
+            work = 0;
             break;
 
         case 'e':
