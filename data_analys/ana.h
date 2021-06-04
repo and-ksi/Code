@@ -223,22 +223,28 @@ long long bit_time_read(unsigned int *in_)
     for(i = 1;; i++){
         ret1 = ((*(in_ + i) & 0xffff0000) >> 16);
         ret2 = *(in_ + i) & 0x0000ffff;
-        if (ret1 == 0xdddd || ret1 == 0xcccc || ret1 == 0xf000){
+        if (ret1 == 0xdddd || ret1 == 0xcccc || ret1 == 0xf000 || ret1 == 0xf00f){
             n++;
         }else{
             break;
         }
-        if (ret2 == 0xdddd || ret2 == 0xcccc || ret2 == 0xf000){
+        if (ret2 == 0xdddd || ret2 == 0xcccc || ret2 == 0xf000 || ret2 == 0xf00f){
             n++;
         }else{
             break;
         }
     }
 
-    if((*(in_ + i + 1) & 0xffff0000) == 0){
-        ret1 = *(in_ + i);
-        ret2 = *(in_ + i + 2);
-        return ((ret1 << 32) | ret2);
+    if(n <= 2 || n > 4){
+        return -1;
+    }
+
+    for(int k = i; k < 3; k++){
+        ret1 = ((*(in_ + k) & 0xffff0000) >> 16);
+        ret2 = *(in_ + k) & 0x0000ffff;
+        if(ret1 == 0xf00f || ret2 == 0xf00f || ret1 == 0xf000 || ret2 == 0xf000){
+            return -1;
+        }
     }
 
     if(n & 1 == 1){
@@ -359,8 +365,9 @@ unsigned int bit_head_read(unsigned int *in_, char sig_0)
     case 'l':
         if ((*in_ >> 16) < 20)
         {
-            for(int i = 2; i < 100; i++){
-                if(*(in_ + i) == 0xddddcccc){
+            for(int i = 1; i < 100; i++){
+                ret = find_adc_head(in_ + i, 0, 90);
+                if(ret < 100){
                     return i - 1;
                 }
             }

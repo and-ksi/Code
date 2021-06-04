@@ -209,11 +209,14 @@ void sort_data()
             //printf("0001\n");
             list_adc[_channel][adc_count[_channel]].m_location = loca;
             list_adc[_channel][adc_count[_channel]].m_timestamp = bit_time_read(recved_pack + loca);
+            if(list_adc[_channel][adc_count[_channel]].m_timestamp < 0){
+                break;
+            }
             list_adc[_channel][adc_count[_channel]].m_length = bit_head_read(recved_pack + loca, 'l');
             //printf("debug: length = %d\n", list_adc[_channel][adc_count[_channel]].m_length);
-            if (list_adc[_channel][adc_count[_channel]].m_length + loca >= PACK_SIZE || list_adc[_channel][adc_count[_channel]].m_length <= 20)
+            if (list_adc[_channel][adc_count[_channel]].m_length + loca >= PACK_SIZE)
             {
-                printf("debug: read channel error!\n");
+                //printf("debug: read channel error!\n");
                 break;
             }
             //printf("debug: adc read end!\n");
