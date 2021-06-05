@@ -303,6 +303,8 @@ int main(int argc, char const *argv[])
             work = 1;
             sleep(1);
             write_data_error_log(&error_fp, pData, PACK_SIZE, 0);
+            fclose(error_fp);
+            error_fp = open_error_log();
             break;
 
         case 'p':

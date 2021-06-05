@@ -247,20 +247,6 @@ void sort_data()
     for(int c = 0; c < 8; c++){
         printf("channel = %d, adc_count = %d\n", c + 1, adc_count[c]);
     }
-
-    // for(int c = 0; c < 8; c++){
-    //     sprintf(buf, "channel_%d.log", c + 1);
-    //     fp[c] = fopen(buf, "w+");
-    //     if(fp == NULL){
-    //         printf("%s open failed!\n", buf);
-    //         exit(1);
-    //     }
-    //     for(int i = 0; i < adc_count[c]; i++){
-    //         fprintf(fp[c], "%d :   channel = %d    timestamp = %llx, loca = %d      %x, %x ,%x, %x, %x\n", i, c, list_adc[c][i].m_timestamp, list_adc[c][i].m_location, recved_pack[list_adc[c][i].m_location - 2], recved_pack[list_adc[c][i].m_location - 1], recved_pack[list_adc[c][i].m_location], recved_pack[list_adc[c][i].m_location + 1], recved_pack[list_adc[c][i].m_location + 2]);
-    //     }
-    //     fclose(fp[c]);
-    // }
-    //exit(1);
 }
 
 void save_data1()

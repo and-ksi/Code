@@ -235,7 +235,7 @@ long long bit_time_read(unsigned int *in_)
         }
     }
 
-    if(n <= 2 || n > 4){
+    if(n < 2 || n > 4){
         return -1;
     }
 
