@@ -68,37 +68,51 @@ int Matching()
     InitStack(S);
     cout << "Please enter expression, limit 20 chars!" << endl;
     cin >> ch;
-    while(ch[i])
+    while(ch[i] != '#' && flag != 0)
     {
         switch (ch[i])
         {
         case '[':
             Push(S, ch[i]);
+            ++i;
             break;
 
         case '(':
             Push(S, ch[i]);
+            ++i;
             break;
 
         case ']':
             if (!StackEmpty(S) && GetTop(S) == '[')
-                Pop(S, x);
+                {
+                    Pop(S, x);
+                    ++i;
+                }
             else
                 flag = 0;
             break;
 
         case ')':
             if (!StackEmpty(S) && GetTop(S) == '(')
+            {
                 Pop(S, x);
+                ++i;
+            }
             else
                 flag = 0;
             break;
         }
     }
     if(StackEmpty(S) && flag == 1)
+    {
+        cout << "It's true!" << endl;
         return true;
+    }
     else
+    {
+        cout << "It's false!" << endl;
         return false;
+    }
 }
 
 int main()
