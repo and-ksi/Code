@@ -1,4 +1,4 @@
-//数制的转换————10->8
+//数制的转换10->8
 #include <iostream>
 #include <stdlib.h>
 using namespace std;
