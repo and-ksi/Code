@@ -66,7 +66,7 @@ int Matching()
     int i = 0;
     LinkStack S;
     InitStack(S);
-    cout << "Please enter expression, limit 20 chars!" << endl;
+    cout << "Please enter expression, limit 20 chars!\n'#' to end your input." << endl;
     cin >> ch;
     while(ch[i] != '#' && flag != 0)
     {
