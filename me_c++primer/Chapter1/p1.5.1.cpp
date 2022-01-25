@@ -3,13 +3,15 @@
 int Item_output()
 {
     Sales_item book;
-    std::cin >> book;
+    if (!(std::cin >> book)){
+        return 0;
+    }
     std::cout << book << std::endl;
-    return 0;
+    return 1;
 }
 
 int main()
 {
-    Item_output();
+    while(Item_output());
     return 0;
 }
