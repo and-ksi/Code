@@ -1,8 +1,15 @@
 #include <iostream>
+#include <cstring>
 
 using namespace std;
 
 int main(){
-    cout << "中文显示！" << endl;
+    const int b = 10;
+    const int a = 20;
+    const int *p = &b;
+    p = &a;
+
+    cout << *p << endl;
+    
     return 0;
 }
