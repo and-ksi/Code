@@ -1,4 +1,6 @@
 #include <iostream>
+#include <time.h>
+
 #define ElemType char
 using namespace std;
 
@@ -12,6 +14,44 @@ typedef struct PosStack{//位置栈，用来存储将来要搜索的位置
     BiTree tree;
     struct PosStack *next;
 }PosStack, *LinkPosStack;
+
+typedef struct QueueNode{
+    BiTree data;
+    struct QueueNode *next;
+}QueueNode, *QueuePoint;
+
+typedef struct LinkQueue{
+    QueuePoint front, rear;
+    int length;
+}LinkQueue;
+
+int InitQueue(LinkQueue &Q){
+    Q.rear = Q.front = new QueueNode;
+    Q.length = 0;
+    Q.front->next = NULL;
+    return 1;
+}
+
+int DeQueue(LinkQueue &Q, BiTree &t){
+    if(Q.front == Q.rear)
+        return -1;
+    t = Q.front->next->data;
+    QueuePoint p = Q.front->next;
+    Q.front->next = p->next;
+    delete p;
+    Q.length++;
+    return 1;
+}
+
+int EnQueue(LinkQueue &Q, BiTree t){
+    QueueNode n;
+    n.data = t;
+    n.next = Q.rear->next;
+    Q.rear->next = &n;
+    Q.rear = &n;
+    Q.length++;
+    return 1;
+}
 
 int Push(LinkPosStack &S, int pos1, int pos2, BiTree tr){
     LinkPosStack p = new PosStack;
@@ -56,6 +96,10 @@ int InsertBin(BiTree &T, ElemType c){
     T->data = c;
     T->lchild = T->rchild = NULL;
     return 1;
+}
+
+int CreateRanBinTree(BiTree &T){
+    
 }
 
 //由输入的前序序列和中序序列生成对应的二叉树
@@ -123,7 +167,7 @@ int BinMidPrint(BiTree T, string &mid){
     LinkPosStack S = NULL;
     int a, b;
     mid = "";
-    while(1){
+    while(1){//优化：while(T || S)
         if(T){
             Push(S, a, b, T);
             T = T->lchild;
@@ -144,19 +188,62 @@ int BinRightPrint(BiTree T, string &right){
     int a, b;
     right = "";
     while(1){
-        
+        if(T){
+            Push(S, 1, b, T);
+            if(T->rchild)
+                Push(S, 0, b, T->rchild);
+            T = T->lchild;
+        }else{
+            if(!S)
+                break;
+            Pop(S, a, b, T);
+            if(a){
+                right += T->data;
+                T = NULL;
+            }
+        }
     }
+    return 1;
+}
+int PostOder(BiTree T, string &right){//标准答案
+    LinkPosStack S = NULL;
+    int a, b;
+    right = "";
+    BiTree r = NULL;
+    while(T || S){
+        if(T){
+            Push(S, a, b, T);
+            T = T->lchild;
+        }else{
+            T = S->tree;
+            if(T->rchild && T->rchild != r)
+                T = T->rchild;
+            else{
+                Pop(S, a, b, T);
+                right += T->data;
+                r = T;
+                T = NULL;
+            }
+        }
+    }
+    return 1;
+}
+
+void InvertLevel(BiTree T, string level1){
+    
 }
 
 int main(){
-    string fr = "ABDCE", en = "BDAEC";
-    // string fr = "ABDGECF", en = "DGBEACF";
+    // string fr = "ABDCE", en = "BDAEC";
+    string fr = "ABDGECF", en = "DGBEACF";
     BiTree T;
     CreateBinTree(T, fr, en);
     string output;
     BinFrontPrint(T, output);
     cout << output << endl;
     BinMidPrint(T, output);
+    cout << output << endl;
+    BinRightPrint(T, output);
     cout << output << endl;
     return 0;
 }
