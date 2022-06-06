@@ -36,9 +36,11 @@ int InitBinQueue(LinkBinQueue &Q){
 int DeBinQueue(LinkBinQueue &Q, BiTree &t){
     if(Q.front == Q.rear)
         return -1;
-    t = Q.front->next->data;
     BinQueuePtr p;
+    t = Q.front->next->data;
     p = Q.front->next;
+    int a;
+    a = 10;
     Q.front->next = p->next;
     delete p;
     Q.length++;
