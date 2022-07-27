@@ -1,78 +1,57 @@
+#ifndef Print_BinTree
+#define Print_BinTree
 #include <iostream>
 #include <stdlib.h>
 #include <time.h>
 #include <string>
 #include <string.h>
 #include <iomanip>
-#include "Print_BinaryTree.h"
-
-#define ElemType string
 using namespace std;
+#ifndef ElemType
+#define ElemType string
+#endif
 
-// typedef struct BiTNode{//二叉树节点
-//     ElemType data;
-//     struct BiTNode *lchild, *rchild;
-// }BiTNode, *BiTree;
+typedef struct BiTNode{//二叉树节点需要定义在头文件内部
+    ElemType data;
+    struct BiTNode *lchild, *rchild;
+}BiTNode, *BiTree;
 
-typedef struct BinStackNode{
-    BiTree tree;
+typedef struct __Print_BiTNode{//二叉树节点
+    string data;
+    struct __Print_BiTNode *lchild, *rchild;
+}__Print_BiTNode, *__Print_BiTree;
+
+int __Print_TranToString(BiTNode *T, __Print_BiTNode *&N){
+    if(!T){
+        N = NULL;
+        return 0;
+    }
+    N = new __Print_BiTNode;
+    stringstream str;
+    str << T->data;
+    str >> N->data;
+    __Print_TranToString(T->lchild, N->lchild);
+    __Print_TranToString(T->rchild, N->rchild);
+
+    return 0;
+}
+
+typedef struct __Print_BinStackNode{
+    __Print_BiTree tree;
     int row;
-    struct BinStackNode *next;
-}BinStackNode, *LinkBinStack;
+    struct __Print_BinStackNode *next;
+}__Print_BinStackNode, *__Print_LinkBinStack;
 
-typedef struct BinQueueNode{
-    BiTree data;    
-    struct BinQueueNode *next;
-}BinQueueNode, *BinQueuePtr;
-
-typedef struct LinkBinQueue{
-    BinQueuePtr front, rear;
-    int length;
-}LinkBinQueue;
-
-int InitBinQueue(LinkBinQueue &Q){
-    Q.rear = Q.front = new BinQueueNode;
-    Q.length = 0;
-    Q.front->next = NULL;
-    return 1;
-}
-
-int DeBinQueue(LinkBinQueue &Q, BiTree &t){
-    if(Q.front == Q.rear)
-        return -1;
-    BinQueuePtr p;
-    t = Q.front->next->data;
-    p = Q.front->next;
-    int a;
-    a = 10;
-    if(Q.front->next == Q.rear)
-        Q.rear = Q.front;
-    Q.front->next = p->next;
-    delete p;
-    Q.length--;
-    return 1;
-}
-
-int EnBinQueue(LinkBinQueue &Q, BiTree t){
-    BinQueuePtr n = new BinQueueNode;
-    n->data = t;
-    n->next = NULL;
-    Q.rear->next = n;
-    Q.rear = n;
-    Q.length++;
-    return 1;
-}
-
-int Push(LinkBinStack &S, BiTree tr){
-    LinkBinStack p = new BinStackNode;
+int __Print_Push(__Print_LinkBinStack &S, __Print_BiTree tr){
+    __Print_LinkBinStack p = new __Print_BinStackNode;
     p->next = S;
     p->tree = tr;
     S = p;
     return 1;
 }
 
-int Push(LinkBinStack &S, BiTree tr, int a){
-    LinkBinStack p = new BinStackNode;
+int __Print_Push(__Print_LinkBinStack &S, __Print_BiTree tr, int a){
+    __Print_LinkBinStack p = new __Print_BinStackNode;
     p->next = S;
     p->tree = tr;
     p->row = a;
@@ -80,90 +59,45 @@ int Push(LinkBinStack &S, BiTree tr, int a){
     return 1;
 }
 
-int Pop(LinkBinStack &S, BiTree &tr){
+int __Print_Pop(__Print_LinkBinStack &S, __Print_BiTree &tr){
     if(!S){
-        cout << "PosStack Pop error!" << endl;
+        cout << "PosStack __Print_Pop error!" << endl;
         exit(1);
     }
     tr = S->tree;
-    LinkBinStack p = S;
+    __Print_LinkBinStack p = S;
     S = S->next;
     delete p;
     return 1;
 }
 
-int Pop(LinkBinStack &S, BiTree &tr, int &r){
+int __Print_Pop(__Print_LinkBinStack &S, __Print_BiTree &tr, int &r){
     if(!S){
-        cout << "PosStack Pop error!" << endl;
+        cout << "PosStack __Print_Pop error!" << endl;
         exit(1);
     }
     tr = S->tree;
     r = S->row;
-    LinkBinStack p = S;
+    __Print_LinkBinStack p = S;
     S = S->next;
     delete p;
     return 1;
 }
 
-int InsertBinNode(BiTree &T, ElemType c){
-    T = new BiTNode;
-    T->data = c;
-    T->lchild = T->rchild = NULL;
-    return 1;
-}
-
-int CreateRandomBinTree_string(BiTree &T, int sig){
-    if(rand() % 30 >= 31){//debug
-        T = NULL;
-        return 1;
-    }
-    BiTree p;
-    string str = "ROOT";
-    InsertBinNode(T, str);
-    p = T;
-    LinkBinQueue Q;
-    BiTree rearold = p, rearnew = NULL;
-    InitBinQueue(Q);
-    EnBinQueue(Q, p);
-    int levnum[26] = {0}, level = 0;
-    char letter = 'A';
-    while(Q.length && letter <= (sig + 'A' - 1)){
-        DeBinQueue(Q, p);
-        if(rand() % 30 < 30){//*****
-            InsertBinNode(p->lchild, letter + to_string(levnum[level]));
-            EnBinQueue(Q, p->lchild);
-            rearnew = p->lchild;
-            levnum[level]++;
-        }
-        if(rand() % 30 < 30){//*****
-            InsertBinNode(p->rchild, letter + to_string(levnum[level]));
-            EnBinQueue(Q, p->rchild);
-            rearnew = p->rchild;
-            levnum[level]++;
-        }
-        if(rearold == p){
-            rearold = rearnew;
-            letter++;
-            level++;
-        }
-    }
-    return 1;
-}
-
-int PrintBinTree(BiTree T){
-    int print_debug(string *strprint, string *strsym);
+int __Print_PrintBinTree(__Print_BiTree T){
+    int __Print_print_debug(string *strprint, string *strsym);
     if(!T)
         return 1;
-    BiTree p = T;
+    __Print_BiTree p = T;
     string strprint[30], strsym[30];
     int printlen = 0, row = 1, len;
     int sig = 1, pos[30] = {0}, mid[30] = {0};//pos存储每行最后一个节点最左端位置
                                               //mid存储符号层'|'位置
 
-    LinkBinStack s = NULL;
+    __Print_LinkBinStack s = NULL;
     if(T->lchild){
         if(T->rchild){
-            Push(s, T->rchild, 1);
+            __Print_Push(s, T->rchild, 1);
         }
         T = T->lchild;
     }else{
@@ -171,7 +105,7 @@ int PrintBinTree(BiTree T){
         T = T->rchild;
     }
 
-    strprint[0] += "*(ROOT)";
+    strprint[0] += " (ROOT)";
     strsym[0] += "**********************";
     pos[0] = 1;
     mid[0] = 3;
@@ -193,7 +127,7 @@ int PrintBinTree(BiTree T){
             strsym[row - 1].insert(printlen, len, ' ');//双亲节点对应符号层改变
             printlen = mid[row - 1];
             mid[row - 1] += len;
-            //print_debug(strprint, strsym);
+            //__Print_print_debug(strprint, strsym);
             for(int i = row - 2; i >= 0; i--){//对其父母节点以上的行增加空格以及'_'
                 if(printlen < mid[i]){//i行为上一行的左孩子
                     if(printlen == mid[i + 1]){//i+1行的中点未变动
@@ -215,13 +149,13 @@ int PrintBinTree(BiTree T){
                         printlen = mid[i];
                     }
                 }
-                //print_debug(strprint, strsym);
+                //__Print_print_debug(strprint, strsym);
             }
             //mid[row - 1] += len;
             if(T->lchild){
                 sig = 1;
                 if(T->rchild)
-                    Push(s, T->rchild, row + 1);
+                    __Print_Push(s, T->rchild, row + 1);
                 T = T->lchild;
                 row++;
             }else{
@@ -232,7 +166,7 @@ int PrintBinTree(BiTree T){
                     row++;
                 }else{
                     if(s)
-                        Pop(s, T, row);
+                        __Print_Pop(s, T, row);
                     else
                         T = NULL;
                 }
@@ -270,12 +204,12 @@ int PrintBinTree(BiTree T){
                         mid[i] += len;
                     }
                 }
-                //print_debug(strprint, strsym);
+                //__Print_print_debug(strprint, strsym);
             }
             if(T->lchild){
                 sig = 1;
                 if(T->rchild)
-                    Push(s, T->rchild, row + 1);
+                    __Print_Push(s, T->rchild, row + 1);
                 T = T->lchild;
                 row++;
             }else{
@@ -286,13 +220,13 @@ int PrintBinTree(BiTree T){
                     row++;
                 }else{
                     if(s)
-                        Pop(s, T, row);
+                        __Print_Pop(s, T, row);
                     else
                         T = NULL;
                 }
             }
         }
-        //print_debug(strprint, strsym);
+        //__Print_print_debug(strprint, strsym);
     }
     for(int i = 0; strprint[i].length() > 0; i++){
         cout << strprint[i] << endl;
@@ -301,19 +235,11 @@ int PrintBinTree(BiTree T){
     return 1;
 }
 
-int print_debug(string *strprint, string *strsym){
-    for(int i = 0; strprint[i].length() > 0; i++){
-        cout << strprint[i] << endl;
-        cout << strsym[i + 1] << endl;
-    }
-    return 1;
-}
-
-int main(){
-    srand(time(NULL));
-    BiTree T;
-    CreateRandomBinTree_string(T, 4);
-    //PrintBinTree(T);
-    Print_Binary_Tree(T);
+int Print_Binary_Tree(BiTNode *T){
+    __Print_BiTNode *N;
+    __Print_TranToString(T, N);
+    __Print_PrintBinTree(N);
     return 0;
 }
+
+#endif
